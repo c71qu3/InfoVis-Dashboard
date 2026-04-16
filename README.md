@@ -65,7 +65,7 @@ Podman **requires** local directory `neo4j/` as described in the project structu
 4. Build all containers:
 
 ```{bash}
-podman-compose --up build -d
+podman-compose up --build -d
 ```
 
 5. To enter the _app_ container:

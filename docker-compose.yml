@@ -1,0 +1,31 @@
+
+services:
+  neo4j:
+    image: neo4j:latest
+    user: "0"
+    volumes:  
+        - ./neo4j/logs:/logs:Z
+        - ./neo4j/config:/config:Z
+        - ./neo4j/data:/data:Z
+        - ./neo4j/plugins:/plugins:Z
+    environment:
+        - NEO4J_AUTH=neo4j/password 
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    restart: always
+
+  app:
+    build: ./app
+    ports:
+      - "5000:5000"
+    environment:
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=password
+    depends_on:
+      - neo4j
+    volumes:
+      - ./app:/app
+      - ./data:/app/data
+    restart: always

@@ -2,6 +2,7 @@ from neo4j import GraphDatabase
 import os
 import sys
 import pandas as pd
+import hashlib
 
 
 NEO4J_URI = os.environ.get("NEO4J_URI", "bolt://neo4j:7687")
@@ -13,6 +14,7 @@ ADDRESS_PATH = DATAPATH.format("Address")
 ENTITY_PATH = DATAPATH.format("Entity")
 INTERMEDIARY_PATH = DATAPATH.format("Intermediary")
 OFFICER_PATH = DATAPATH.format("Officer")
+EDGES_PATH = DATAPATH.format("Edges")
 
 
 def load_csv_upsert(
@@ -39,7 +41,7 @@ def load_csv_upsert(
         tx.run(
             f"""
             CREATE CONSTRAINT {constraint_name} IF NOT EXISTS
-            FOR (n:`{label}`)
+            FOR (n:Node)
             REQUIRE n.{unique_key} IS UNIQUE
             """)
 
@@ -47,7 +49,7 @@ def load_csv_upsert(
         tx.run(
             f"""
             UNWIND $rows AS row
-            MERGE (n:`{label}` {{{unique_key}: row.{unique_key}}})
+            MERGE (n:Node:`{label}` {{{unique_key}: row.{unique_key}}})
             SET n += row
             """,
             rows=batch_rows)
@@ -163,7 +165,76 @@ def load_officer_csv(driver, path: str=OFFICER_PATH, batch: int=5000) -> int:
     )
 
 
+def load_edges_csv(driver, path: str = EDGES_PATH, batch: int = 5000) -> int:
+    df = pd.read_csv(
+        path,
+        dtype={
+            "node_id_start": "Int64",
+            "node_id_end": "Int64",
+            "rel_type": str,
+            "link": str,
+            "status": str,
+            "sourceID": str,
+            "start_date": str,
+            "end_date": str,
+        },
+        encoding="utf-8",
+        low_memory=False)
+    df = df.where(pd.notnull(df), None)
+    df = df[df["node_id_start"].notnull() & df["node_id_end"].notnull() & df["rel_type"].notnull()]
 
+    for c in ["start_date", "end_date"]:
+        if c in df.columns:
+            dt = pd.to_datetime(df[c], errors="coerce")
+            df[c] = dt.dt.date
+
+    def _edge_id(row) -> str:
+        raw = "|".join([
+            str(row.get("node_id_start") or ""),
+            str(row.get("rel_type") or ""),
+            str(row.get("node_id_end") or ""),
+            str(row.get("link") or ""),
+            str(row.get("start_date") or ""),
+            str(row.get("end_date") or ""),
+            str(row.get("sourceID") or ""),
+        ])
+        return hashlib.sha1(raw.encode("utf-8")).hexdigest()
+
+    df["edge_id"] = df.apply(_edge_id, axis=1)
+
+    total = 0
+    with driver.session() as session:
+        for rel_type, grp in df.groupby("rel_type", dropna=True):
+            rel_type_str = str(rel_type)
+
+            safe_name = "".join(ch if (ch.isalnum() or ch == "_") else "_" for ch in rel_type_str).lower()
+            constraint_name = f"rel_{safe_name}_edge_id_unique"
+
+            def _ensure_rel_constraint(tx):
+                tx.run(
+                    f"""
+                    CREATE CONSTRAINT {constraint_name} IF NOT EXISTS
+                    FOR ()-[r:`{rel_type_str}`]-()
+                    REQUIRE r.edge_id IS UNIQUE
+                    """)
+
+            def _merge_batch(tx, batch_rows) -> int:
+                res = tx.run(
+                    f"""
+                    UNWIND $rows AS row
+                    MATCH (a:Node {{node_id: row.node_id_start}})
+                    MATCH (b:Node {{node_id: row.node_id_end}})
+                    MERGE (a)-[r:`{rel_type_str}` {{edge_id: row.edge_id}}]->(b)
+                    SET r += row
+                    """,
+                    rows=batch_rows)
+                return res.consume().counters.relationships_created
+
+            session.execute_write(_ensure_rel_constraint)
+            rows = grp.to_dict("records")
+            for i in range(0, len(rows), batch):
+                total += session.execute_write(_merge_batch, rows[i : i + batch])
+    return total
 
 
 try:
@@ -172,6 +243,7 @@ try:
     print(f"Entities added: {load_entity_csv(driver)}")
     print(f"Intermediaries added: {load_intermediary_csv(driver)}")
     print(f"Officers added: {load_officer_csv(driver)}")
+    print(f"Edges added: {load_edges_csv(driver)}")
 
 except Exception as e:
     print(f"Failed to connect to Neo4j at {NEO4J_URI}:\n{e}")

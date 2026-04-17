@@ -38,6 +38,24 @@ try:
         ).single()["officer_count"]
         print(f"Officer nodes found: {officer_count}")
 
+        rel_count = session.run(
+            "MATCH ()-[r]->() RETURN count(r) AS rel_count"
+        ).single()["rel_count"]
+        print(f"Relationships found: {rel_count}")
+
+        rel_types = session.run(
+            """
+            MATCH ()-[r]->()
+            RETURN type(r) AS rel_type, count(r) AS cnt
+            ORDER BY cnt DESC
+            LIMIT 20
+            """
+        ).data()
+        if rel_types:
+            print("Top relationship types:")
+            for row in rel_types:
+                print(f"  {row['rel_type']}: {row['cnt']}")
+
         sys.exit(0)
 except Exception as e:
     print(f"Failed to connect to Neo4j at {NEO4J_URI}:\n{e}")

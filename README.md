@@ -13,20 +13,13 @@
     ├── uv.lock
     │
     ├── data/
+    │   ├── raw/
     │   ├── full-oldb.LATEST.zip
     │   ├── Address.csv
     │   ├── Edges.csv
     │   ├── Entity.csv
     │   ├── Intermediary.csv
-    │   ├── Officer.csv
-    │   │
-    │   └── raw/
-    │       ├── nodes-addresses.csv
-    │       ├── nodes-entities.csv
-    │       ├── nodes-intermediaries.csv
-    │       ├── nodes-officers.csv
-    │       ├── nodes-others.csv
-    │       └── relationships.csv
+    │   └── Officer.csv
     │
     ├── neo4j/
     │   ├── logs/

@@ -28,6 +28,16 @@ try:
         ).single()["entity_count"]
         print(f"Entity nodes found: {entity_count}")
 
+        intermediary_count = session.run(
+            "MATCH (e:Intermediary) RETURN count(e) AS intermediary_count"
+        ).single()["intermediary_count"]
+        print(f"Intermediary nodes found: {intermediary_count}")
+
+        officer_count = session.run(
+            "MATCH (e:Officer) RETURN count(e) AS officer_count"
+        ).single()["officer_count"]
+        print(f"Officer nodes found: {officer_count}")
+
         sys.exit(0)
 except Exception as e:
     print(f"Failed to connect to Neo4j at {NEO4J_URI}:\n{e}")

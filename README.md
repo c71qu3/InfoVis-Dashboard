@@ -31,6 +31,7 @@
         ├── Dockerfile
         ├── app.py
         └── src/
+            ├── load_neo4j.py
             ├── check_neo4j.py
             └── plugins
 
@@ -38,11 +39,6 @@
 ## Data
 
 In `/filter_data.ipynb` only _Panama Papers_ entries are kept in order to make the data more manageable.
-
-
-### Neo4j
-
-Podman **requires** local directory `neo4j/` as described in the project structure and the `docker-compose.yml` file.
 
 
 ## Setup
@@ -64,5 +60,10 @@ podman-compose up --build -d
 5. To enter the _app_ container:
 
 ```{bash}
-podman run --rm -it -v "$(pwd)/app:/app:Z" --network project_default -w /app localhost/project_app:latest bash
+podman run --rm -it \
+    -v "$(pwd)/app:/app:Z" \
+    -v "$(pwd)/data:/app/data:Z" \
+    --network project_default \
+    -w /app \
+    localhost/project_app:latest bash
 ```

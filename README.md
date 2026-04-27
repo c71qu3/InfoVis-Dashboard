@@ -35,6 +35,9 @@
             ├── check.py
             └── plugins
 
+The CSV files in `data/` are extracted by `filter_data.ipynb`.
+The `neo4j/` directory and its sub-directories are created by the Neo4j container.
+
 
 ## Data
 
@@ -69,7 +72,7 @@ podman-compose up --build
 ```
 
 If the Neo4j database is empty it will take a moment to load the data.
-When ready, it will show the Flask app [http://localholt:5000](http://localholt:5000) in the host machine.
+When ready, it will show the Flask app [http://localhost:5000](http://localhost:5000) in the host machine.
 
 To stop the container:
 

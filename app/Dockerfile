@@ -1,14 +1,14 @@
 FROM python:trixie
 
-# Set working directory
-ADD ./pyproject.toml /app/
-WORKDIR /app
-
 # Install uv package manager
 COPY --from=ghcr.io/astral-sh/uv:0.6.3 /uv /uvx /bin/
+ENV UV_PROJECT_ENVIRONMENT=/venv
+RUN mkdir -p /venv
+ENV PATH="/venv/bin:${PATH}"
+
+# Set working directory
+WORKDIR /app
 
 # Initialize virtual environment
-RUN uv venv
-
-# Open a bash shell (with the uv environment)
-CMD ["bash"]
+COPY ./pyproject.toml /app/
+RUN uv venv && uv sync

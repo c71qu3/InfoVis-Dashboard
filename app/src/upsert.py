@@ -3,6 +3,7 @@ import os
 import sys
 import pandas as pd
 import hashlib
+import math
 
 
 NEO4J_URI = os.environ.get("NEO4J_URI", "bolt://neo4j:7687")
@@ -16,6 +17,14 @@ INTERMEDIARY_PATH = DATAPATH.format("Intermediary")
 OFFICER_PATH = DATAPATH.format("Officer")
 EDGES_PATH = DATAPATH.format("Edges")
 
+FORCE_RELOAD = os.environ.get("FORCE_RELOAD", "0") == "1"
+
+
+def db_has_data(driver) -> bool:
+    with driver.session() as session:
+        rec = session.run("MATCH (n:Node) RETURN count(n) AS c").single()
+        return (rec["c"] or 0) > 0
+
 
 def load_csv_upsert(
     driver, label: str, path: str,
@@ -23,7 +32,7 @@ def load_csv_upsert(
     batch: int=5000, date_cols: list=[]
 ) -> int:
     df = pd.read_csv(path, dtype=dtype, encoding="utf-8", low_memory=False)
-    df = df.where(pd.notnull(df), None)
+    df = df.astype("object").where(pd.notnull(df), None)
 
     if unique_key in df.columns:
         df = df[df[unique_key].notnull()]
@@ -34,8 +43,16 @@ def load_csv_upsert(
                 dt = pd.to_datetime(df[col], errors="coerce")
                 df[col] = dt.dt.date
 
-    rows = df.to_dict("records")
-    constraint_name = f"{label.lower()}_{unique_key}_unique"
+    def _clean_value(v):
+        if isinstance(v, float) and math.isnan(v):
+            return None
+        return v
+
+    rows = [
+        {k: _clean_value(v) for k, v in row.items()}
+        for row in df.to_dict("records")]
+
+    constraint_name = f"node_{unique_key}_unique"
 
     def _ensure_constraints(tx):
         tx.run(
@@ -239,6 +256,12 @@ def load_edges_csv(driver, path: str = EDGES_PATH, batch: int = 5000) -> int:
 
 try:
     driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASS))
+
+    if db_has_data(driver) and not FORCE_RELOAD:
+        print("Neo4j already has data (found :Node nodes).")
+        print("Skipping import. Set FORCE_RELOAD=1 to force.")
+        sys.exit(0)
+
     print(f"Adresses added: {load_address_csv(driver)}")
     print(f"Entities added: {load_entity_csv(driver)}")
     print(f"Intermediaries added: {load_intermediary_csv(driver)}")

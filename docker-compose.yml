@@ -9,7 +9,7 @@ services:
         - ./neo4j/data:/data:Z
         - ./neo4j/plugins:/plugins:Z
     environment:
-        - NEO4J_AUTH=neo4j/password 
+        - NEO4J_AUTH=neo4j/password
     ports:
       - "7474:7474"
       - "7687:7687"
@@ -25,7 +25,9 @@ services:
       - NEO4J_PASSWORD=password
     depends_on:
       - neo4j
+    working_dir: /app
     volumes:
-      - ./app:/app
-      - ./data:/app/data
+      - ./app:/app:Z
+      - ./data:/app/data:Z
+    command: ["uv", "run", "python", "src/startup.py"]
     restart: always

@@ -31,8 +31,8 @@
         ├── Dockerfile
         ├── app.py
         └── src/
-            ├── load_neo4j.py
-            ├── check_neo4j.py
+            ├── upsert.py
+            ├── check.py
             └── plugins
 
 
@@ -43,27 +43,36 @@ In `/filter_data.ipynb` only _Panama Papers_ entries are kept in order to make t
 
 ## Setup
 
-1. Download the ZIP file and save it in the `project/data/` directory. The raw data can be found [here](https://offshoreleaks.icij.org/pages/database).
+1. Clone the repo:
 
-2. Prepare the workspace by running `uv venv`.
+```{bash}
+git clone git@github.com:c71qu3/InfoVis-Dashboard.git
+```
 
-3. Run `filter_data.ipynb` notebook to unpack ZIP file.
+2. Download the ZIP file and save it in the `InfoVis-Dashboard/data/` directory. The raw data can be found [here](https://offshoreleaks.icij.org/pages/database).
+
+3. Prepare the workspace by running:
+
+```{bash}
+uv venv
+uv sync
+```
+
+4. Run `filter_data.ipynb` notebook to unpack ZIP file.
 
 **Note:** If you use _Docker_ instead of _Podman_ just replace the commands (`docker-compose` in place of `podman-compose`).
 
-4. Build all containers:
+5. Build all containers from the `InfoVis-Dashboard/` directory:
 
 ```{bash}
-podman-compose up --build -d
+podman-compose up --build
 ```
 
-5. To enter the _app_ container:
+If the Neo4j database is empty it will take a moment to load the data.
+When ready, it will show the Flask app [http://localholt:5000](http://localholt:5000) in the host machine.
+
+To stop the container:
 
 ```{bash}
-podman run --rm -it \
-    -v "$(pwd)/app:/app:Z" \
-    -v "$(pwd)/data:/app/data:Z" \
-    --network project_default \
-    -w /app \
-    localhost/project_app:latest bash
+podman-compose down
 ```

@@ -1,14 +1,9 @@
-FROM python:trixie
+FROM python:3.13-slim
 
-# Install uv package manager
-COPY --from=ghcr.io/astral-sh/uv:0.6.3 /uv /uvx /bin/
-ENV UV_PROJECT_ENVIRONMENT=/venv
-RUN mkdir -p /venv
-ENV PATH="/venv/bin:${PATH}"
-
-# Set working directory
 WORKDIR /app
 
-# Initialize virtual environment
-COPY ./pyproject.toml /app/
-RUN uv venv && uv sync
+RUN pip install flask neo4j pandas requests
+
+COPY . .
+
+CMD ["python", "app.py"]

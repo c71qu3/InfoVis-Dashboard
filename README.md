@@ -68,6 +68,15 @@ uv sync
 5. Build all containers from the `InfoVis-Dashboard/` directory:
 
 ```{bash}
+podman machine init
+```
+
+```{bash}
+podman machine start
+```
+
+
+```{bash}
 podman-compose up --build
 ```
 

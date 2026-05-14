@@ -1,15 +1,14 @@
-
 services:
   neo4j:
     image: neo4j:latest
     user: "0"
-    volumes:  
-        - ./neo4j/logs:/logs:Z
-        - ./neo4j/config:/config:Z
-        - ./neo4j/data:/data:Z
-        - ./neo4j/plugins:/plugins:Z
+    volumes:
+      - ./neo4j/logs:/logs:Z
+      - ./neo4j/config:/config:Z
+      - ./neo4j/data:/data:Z
+      - ./neo4j/plugins:/plugins:Z
     environment:
-        - NEO4J_AUTH=neo4j/password
+      - NEO4J_AUTH=neo4j/password
     ports:
       - "7474:7474"
       - "7687:7687"
@@ -17,17 +16,17 @@ services:
 
   app:
     build: ./app
+    working_dir: /app
+    volumes:
+      - ./app:/app
+      - ./data:/app/data
     ports:
-      - "5000:5000"
+      - "5001:5000"
     environment:
       - NEO4J_URI=bolt://neo4j:7687
       - NEO4J_USER=neo4j
       - NEO4J_PASSWORD=password
     depends_on:
       - neo4j
-    working_dir: /app
-    volumes:
-      - ./app:/app:Z
-      - ./data:/app/data:Z
-    command: ["uv", "run", "python", "src/startup.py"]
+    command: ["python", "app.py"]
     restart: always

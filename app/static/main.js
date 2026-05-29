@@ -31,6 +31,14 @@
     console.log("Built name→ISO2 map with", nameToIso2.size, "entries");
   } catch(e) { console.warn(e); }
 
+  // Build topojson numeric id → ISO3, used for the offshore graph. Goes straight
+  // off the map's own ids so territories the World Bank omits (e.g. Hong Kong) work.
+  let numericToIso3 = new Map();
+  try {
+    const isoNum = await fetch('/static/data/iso_numeric.json').then(r => r.json());
+    for (const [iso3, num] of Object.entries(isoNum)) numericToIso3.set(String(num), iso3);
+  } catch(e) { console.warn(e); }
+
   // get ISO2 from country name (with fuzzy matching) 
   function getIso2ForCountryName(name) {
     if (!name) return null;
@@ -142,30 +150,38 @@
     .on('mouseout', hideTip)
     .on('click', async (e, d) => {
       e.stopPropagation();
-      let countryName = d.properties?.name;
+      const countryName = d.properties?.name;
       if (!countryName) return;
       const iso2 = getIso2ForCountryName(countryName);
-      if (!iso2) {
-        clearInfo();
-        nameEl.textContent = countryName;
-        hintEl.textContent = `No World Bank data for "${countryName}".`;
-        return;
-      }
+      const iso3 = numericToIso3.get(String(d.id));
+
       if (selectedId === d.id) {
         selectedId = null;
         paths.classed('selected', false);
         clearInfo();
+        clearGraph();
         return;
       }
       selectedId = d.id;
       paths.classed('selected', f => f.id === d.id);
-      await loadCountry(countryName, iso2);
+
+      loadGraph(iso3, countryName);
+
+      if (iso2) {
+        await loadCountry(countryName, iso2);
+      } else {
+        clearInfo();
+        nameEl.textContent = countryName;
+        nameEl.classList.remove('empty');
+        hintEl.textContent = `No World Bank data for "${countryName}".`;
+      }
     });
 
   svg.on('click', () => {
     selectedId = null;
     paths.classed('selected', false);
     clearInfo();
+    clearGraph();
   });
 
   // DOM elements for info panel
@@ -258,4 +274,253 @@
       hintEl.style.display = '';
     }
   }
+
+  // ---- Knowledge graph panel ----
+  const TYPE_COLORS = {
+    Entity: '#4f8ef7', Officer: '#f7a24f',
+    Intermediary: '#5fd0a0', Address: '#b07ff7', Node: '#6b7a99'
+  };
+  const graphHint = document.getElementById('graph-hint');
+  let graphSvg = null, graphG = null, graphSim = null, graphZoom = null, graphReq = 0;
+
+  function clearGraph() {
+    graphReq++; // invalidate any in-flight request
+    if (graphSim) graphSim.stop();
+    if (graphG) graphG.selectAll('*').remove();
+    graphHint.style.display = '';
+    graphHint.textContent = 'Click a country to see its offshore network.';
+  }
+
+  async function loadGraph(iso3, name) {
+    const token = ++graphReq;
+    if (!iso3) {
+      clearGraph();
+      graphHint.textContent = `No offshore network for ${name || 'this country'}.`;
+      return;
+    }
+    graphHint.style.display = '';
+    graphHint.textContent = 'Loading network…';
+    let data;
+    try {
+      const res = await fetch(`/api/graph/${iso3}`);
+      data = await res.json();
+    } catch(e) {
+      if (token !== graphReq) return;
+      console.warn(e);
+      graphHint.textContent = 'Error loading network.';
+      return;
+    }
+    if (token !== graphReq) return; // a newer selection superseded this one
+    if (data.error) {
+      clearGraph();
+      graphHint.textContent = 'Graph database unavailable.';
+      return;
+    }
+    if (!data.nodes || data.nodes.length === 0) {
+      clearGraph();
+      graphHint.textContent = `No offshore network for ${name || iso3}.`;
+      return;
+    }
+    graphHint.style.display = 'none';
+    renderGraph(data);
+  }
+
+  function renderGraph(data) {
+    if (graphSim) graphSim.stop(); // halt any previous simulation
+    ensureGraphSvg();
+    document.getElementById('graph-legend').style.display = 'flex';
+    const el = document.getElementById('graph-panel');
+    const W = el.clientWidth, H = el.clientHeight;
+    graphG.selectAll('*').remove();
+
+    const nodes = data.nodes.map(n => ({ ...n }));
+
+    // collapse repeat links between the same pair; weight = connection frequency
+    const linkMap = new Map();
+    for (const l of data.links) {
+      const key = l.source < l.target ? `${l.source}|${l.target}` : `${l.target}|${l.source}`;
+      const existing = linkMap.get(key);
+      if (existing) existing.weight++;
+      else linkMap.set(key, { source: l.source, target: l.target, rel: l.rel, weight: 1 });
+    }
+    const links = [...linkMap.values()];
+
+    const maxDeg = d3.max(nodes, d => d.degree) || 1;
+    const rScale = d3.scaleSqrt().domain([0, maxDeg]).range([3.5, 15]);
+    const maxWeight = d3.max(links, d => d.weight) || 1;
+    const wScale = d3.scaleLinear().domain([1, maxWeight]).range([1, 4]);
+    const oScale = d3.scaleLinear().domain([1, maxWeight]).range([0.35, 0.85]);
+
+    const link = graphG.append('g').selectAll('line')
+      .data(links).join('line')
+      .attr('class', 'glink')
+      .attr('stroke-width', d => wScale(d.weight))
+      .attr('stroke-opacity', d => oScale(d.weight));
+
+    const node = graphG.append('g').selectAll('circle')
+      .data(nodes).join('circle')
+      .attr('class', 'gnode')
+      .attr('r', d => rScale(d.degree))
+      .attr('fill', d => TYPE_COLORS[d.type] || TYPE_COLORS.Node)
+      .call(nodeDrag())
+      .on('mouseover', (e, d) => showTip(e, `${d.label} · ${d.type}${d.degree ? ` · ${d.degree} links` : ''}`))
+      .on('mousemove', moveTip)
+      .on('mouseout', hideTip);
+
+    // only label the top hubs by degree so the view stays readable
+    const hubIds = new Set([...nodes].sort((a, b) => b.degree - a.degree).slice(0, 8).map(d => d.id));
+    const hubs = nodes.filter(d => hubIds.has(d.id) && d.degree > 1);
+    const label = graphG.append('g').selectAll('text')
+      .data(hubs).join('text')
+      .attr('class', 'glabel')
+      .text(d => d.label.length > 18 ? d.label.slice(0, 17) + '…' : d.label);
+
+    graphSim = d3.forceSimulation(nodes)
+      .force('link', d3.forceLink(links).id(d => d.id).distance(34).strength(0.6))
+      .force('charge', d3.forceManyBody().strength(-60))
+      .force('center', d3.forceCenter(W / 2, H / 2))
+      .force('x', d3.forceX(W / 2).strength(0.06))
+      .force('y', d3.forceY(H / 2).strength(0.06))
+      .force('collide', d3.forceCollide().radius(d => rScale(d.degree) + 3))
+      .on('tick', () => {
+        link.attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+            .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+        node.attr('cx', d => d.x).attr('cy', d => d.y);
+        label.attr('x', d => d.x + rScale(d.degree) + 2).attr('y', d => d.y + 3);
+      })
+      .on('end', () => fitView(nodes, rScale));
+  }
+
+  // shared layout helpers (used by both the entity graph and jurisdiction view)
+  function fitView(nodes, rScale) {
+    if (!nodes.length) return;
+    const el = document.getElementById('graph-panel');
+    const W = el.clientWidth, H = el.clientHeight, pad = 16;
+    const minX = d3.min(nodes, d => d.x - rScale(d.degree));
+    const maxX = d3.max(nodes, d => d.x + rScale(d.degree)) + 90; // room for labels
+    const minY = d3.min(nodes, d => d.y - rScale(d.degree));
+    const maxY = d3.max(nodes, d => d.y + rScale(d.degree)) + 8;
+    const gw = maxX - minX || 1, gh = maxY - minY || 1;
+    const scale = Math.min((W - pad * 2) / gw, (H - pad * 2) / gh, 2);
+    const tx = (W - scale * (minX + maxX)) / 2;
+    const ty = (H - scale * (minY + maxY)) / 2;
+    graphSvg.transition().duration(400)
+      .call(graphZoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale));
+  }
+
+  function nodeDrag() {
+    return d3.drag()
+      .on('start', (e, d) => { if (!e.active) graphSim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+      .on('drag', (e, d) => { d.fx = e.x; d.fy = e.y; })
+      .on('end', (e, d) => { if (!e.active) graphSim.alphaTarget(0); d.fx = null; d.fy = null; });
+  }
+
+  function ensureGraphSvg() {
+    if (graphSvg) return;
+    const el = document.getElementById('graph-panel');
+    graphSvg = d3.select('#graph-panel').append('svg').attr('viewBox', `0 0 ${el.clientWidth} ${el.clientHeight}`);
+    graphG = graphSvg.append('g');
+    graphZoom = d3.zoom().scaleExtent([0.2, 5]).on('zoom', e => graphG.attr('transform', e.transform));
+    graphSvg.call(graphZoom);
+  }
+
+  // ---- Jurisdiction-flow view: countries as nodes, cross-border links as edges ----
+  const LINE_PALETTE = ['#4f8ef7', '#f7a24f', '#5fd0a0', '#b07ff7', '#e0708f', '#5cc8e0', '#d8c45a', '#8c7bf0'];
+
+  async function loadJurisdictions(focus = null) {
+    const token = ++graphReq; // a newer selection bumps this and supersedes us
+    graphHint.style.display = '';
+    graphHint.textContent = 'Loading jurisdiction flows…';
+    let data;
+    try {
+      const url = focus ? `/api/jurisdictions?focus=${focus}` : '/api/jurisdictions';
+      data = await fetch(url).then(r => r.json());
+    } catch(e) {
+      if (token !== graphReq) return;
+      console.warn(e);
+      graphHint.textContent = 'Error loading flows.';
+      return;
+    }
+    if (token !== graphReq) return; // superseded while we loaded
+    if (data.error) { clearGraph(); graphHint.textContent = 'Graph database unavailable.'; return; }
+    if (!data.nodes || data.nodes.length === 0) {
+      clearGraph();
+      graphHint.textContent = focus ? `No cross-border flows for ${focus}.` : 'No jurisdiction data.';
+      return;
+    }
+    graphHint.style.display = 'none';
+    renderJurisdictions(data);
+  }
+
+  function renderJurisdictions(data) {
+    if (graphSim) graphSim.stop();
+    ensureGraphSvg();
+    document.getElementById('graph-legend').style.display = 'none'; // entity-type legend N/A here
+    graphG.selectAll('*').remove();
+
+    const el = document.getElementById('graph-panel');
+    const W = el.clientWidth, H = el.clientHeight;
+    const nodes = data.nodes.map(n => ({ ...n }));
+    const srcColor = new Map();
+    let ci = 0;
+    const links = data.links.map(l => {
+      if (!srcColor.has(l.source)) srcColor.set(l.source, LINE_PALETTE[ci++ % LINE_PALETTE.length]);
+      return { ...l, color: srcColor.get(l.source) };
+    });
+
+    const maxDeg = d3.max(nodes, d => d.degree) || 1;
+    const rScale = d3.scaleSqrt().domain([0, maxDeg]).range([5, 20]);
+    const maxW = d3.max(links, d => d.weight) || 1;
+    const wScale = d3.scaleLinear().domain([1, maxW]).range([1.2, 6]);
+
+    const link = graphG.append('g').selectAll('path')
+      .data(links).join('path')
+      .attr('fill', 'none')
+      .attr('stroke', d => d.color)
+      .attr('stroke-opacity', 0.55)
+      .attr('stroke-width', d => wScale(d.weight))
+      .attr('stroke-linecap', 'round');
+
+    const node = graphG.append('g').selectAll('circle')
+      .data(nodes).join('circle')
+      .attr('class', 'gnode')
+      .attr('r', d => rScale(d.degree))
+      .attr('fill', d => d.focus ? '#f7a24f' : '#cdd6f0')
+      .attr('stroke', d => d.focus ? '#fff' : '#0f1117')
+      .attr('stroke-width', d => d.focus ? 2 : 1)
+      .call(nodeDrag())
+      .on('mouseover', (e, d) => showTip(e, `${d.label} · ${d.degree.toLocaleString()} cross-border links`))
+      .on('mousemove', moveTip)
+      .on('mouseout', hideTip);
+
+    const label = graphG.append('g').selectAll('text')
+      .data(nodes).join('text')
+      .attr('class', 'glabel')
+      .text(d => d.id);
+
+    const ticked = () => {
+      link.attr('d', d => {
+        const x1 = d.source.x, y1 = d.source.y, x2 = d.target.x, y2 = d.target.y;
+        const cx = (x1 + x2) / 2 - (y2 - y1) * 0.15;
+        const cy = (y1 + y2) / 2 + (x2 - x1) * 0.15;
+        return `M${x1},${y1} Q${cx},${cy} ${x2},${y2}`;
+      });
+      node.attr('cx', d => d.x).attr('cy', d => d.y);
+      label.attr('x', d => d.x + rScale(d.degree) + 3).attr('y', d => d.y + 3);
+    };
+
+    graphSim = d3.forceSimulation(nodes)
+      .force('link', d3.forceLink(links).id(d => d.id).distance(60).strength(0.2))
+      .force('charge', d3.forceManyBody().strength(-150))
+      .force('center', d3.forceCenter(W / 2, H / 2))
+      .force('x', d3.forceX(W / 2).strength(0.08))
+      .force('y', d3.forceY(H / 2).strength(0.08))
+      .force('collide', d3.forceCollide().radius(d => rScale(d.degree) + 6))
+      .stop();
+    for (let i = 0; i < 300; i++) graphSim.tick(); // settle synchronously for a stable layout
+    ticked();
+    fitView(nodes, rScale);
+    graphSim.on('tick', ticked).on('end', () => fitView(nodes, rScale));
+  }
+
 })();

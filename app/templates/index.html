@@ -183,11 +183,43 @@
 
     #loading-indicator.active { display: block; }
 
-    #graph-panel {
-      grid-column: 1; grid-row: 3;
+    #graph-panel { grid-column: 1; grid-row: 3; }
+
+    #graph-panel svg { width: 100%; height: 100%; cursor: grab; }
+    #graph-panel svg:active { cursor: grabbing; }
+
+    .glink { stroke: #33415c; }
+    .gnode { stroke: #0f1117; stroke-width: 1px; cursor: pointer; }
+    .glabel { font-size: 8px; fill: var(--text); pointer-events: none; }
+
+    #graph-hint {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      color: var(--muted);
+      font-size: 0.72rem;
+      letter-spacing: 0.08em;
+      text-align: center;
+      padding: 0 1.5rem;
+    }
+
+    #graph-legend {
+      position: absolute;
+      bottom: 8px; left: 10px;
+      z-index: 10;
       display: flex;
-      align-items: center;
-      justify-content: center;
+      gap: 0.7rem;
+      font-size: 0.55rem;
+      color: var(--muted);
+      pointer-events: none;
+    }
+
+    #graph-legend i {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      margin-right: 3px;
+      vertical-align: middle;
     }
 
     #list-panel {
@@ -241,7 +273,13 @@
 <!-- GRAPH -->
 <div class="panel" id="graph-panel">
   <div class="panel-label">Knowledge Graph</div>
-  <p>[ graph view — coming soon ]</p>
+  <div id="graph-legend">
+    <span><i style="background:#4f8ef7"></i>Entity</span>
+    <span><i style="background:#f7a24f"></i>Officer</span>
+    <span><i style="background:#5fd0a0"></i>Intermediary</span>
+    <span><i style="background:#b07ff7"></i>Address</span>
+  </div>
+  <p id="graph-hint">Click a country to see its offshore network.</p>
 </div>
 
 <!-- LIST -->

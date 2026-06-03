@@ -4,6 +4,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests
 
 
+_session = requests.Session()
+_executor = ThreadPoolExecutor(max_workers=8)
+
+
 # World Bank indicators
 WB_INDICATORS = {
     "GDP (current US$)": "NY.GDP.MKTP.CD",
@@ -24,7 +28,7 @@ year_cache = {}
 def get_all_countries():
     url = "https://api.worldbank.org/v2/country?format=json&per_page=300"
     try:
-        resp = requests.get(url, timeout=10)
+        resp = _session.get(url, timeout=10)
         data = resp.json()
         countries = []
         if isinstance(data, list) and len(data) > 1:
@@ -41,7 +45,7 @@ def get_all_countries():
 def fetch_latest_for_indicator(iso2, label, code):
     url = f"https://api.worldbank.org/v2/country/{iso2}/indicator/{code}?format=json&per_page=100"
     try:
-        r = requests.get(url, timeout=10)
+        r = _session.get(url, timeout=10)
         data = r.json()
         if isinstance(data, list) and len(data) > 1 and data[1]:
             for entry in data[1]:
@@ -59,13 +63,12 @@ def fetch_latest_all(iso2):
     if iso2 in latest_cache:
         return latest_cache[iso2]
     results = {}
-    with ThreadPoolExecutor(max_workers=8) as executor:
-        futures = {
-            executor.submit(fetch_latest_for_indicator, iso2, label, code): label
-            for label, code in WB_INDICATORS.items()
-        }
-        for future in as_completed(futures):
-            results.update(future.result())
+    futures = {
+        _executor.submit(fetch_latest_for_indicator, iso2, label, code): label
+        for label, code in WB_INDICATORS.items()
+    }
+    for future in as_completed(futures):
+        results.update(future.result())
     latest_cache[iso2] = results
     return results
 
@@ -73,7 +76,7 @@ def fetch_latest_all(iso2):
 def fetch_year_for_indicator(iso2, year, label, code):
     url = f"https://api.worldbank.org/v2/country/{iso2}/indicator/{code}?format=json&per_page=100"
     try:
-        r = requests.get(url, timeout=5)
+        r = _session.get(url, timeout=5)
         data = r.json()
         if isinstance(data, list) and len(data) > 1:
             for entry in data[1]:
@@ -89,13 +92,12 @@ def fetch_year_all(iso2, year):
     if iso2 in year_cache and year in year_cache[iso2]:
         return year_cache[iso2][year]
     results = {}
-    with ThreadPoolExecutor(max_workers=8) as executor:
-        futures = {
-            executor.submit(fetch_year_for_indicator, iso2, year, label, code): label
-            for label, code in WB_INDICATORS.items()
-        }
-        for future in as_completed(futures):
-            results.update(future.result())
+    futures = {
+        _executor.submit(fetch_year_for_indicator, iso2, year, label, code): label
+        for label, code in WB_INDICATORS.items()
+    }
+    for future in as_completed(futures):
+        results.update(future.result())
     if iso2 not in year_cache:
         year_cache[iso2] = {}
     year_cache[iso2][year] = results
@@ -107,7 +109,7 @@ def get_available_years(iso2):
     url = f"https://api.worldbank.org/v2/country/{iso2}/indicator/{code}?format=json&per_page=100"
     years = set()
     try:
-        r = requests.get(url, timeout=5)
+        r = _session.get(url, timeout=5)
         data = r.json()
         if isinstance(data, list) and len(data) > 1:
             for entry in data[1]:
@@ -125,7 +127,7 @@ iso3_to_name = {}
 
 
 try:
-    resp = requests.get("https://api.worldbank.org/v2/country?format=json&per_page=300", timeout=10)
+    resp = _session.get("https://api.worldbank.org/v2/country?format=json&per_page=300", timeout=10)
     data = resp.json()
     if isinstance(data, list) and len(data) > 1:
         for c in data[1]:

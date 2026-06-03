@@ -18,8 +18,8 @@ services:
     build: ./app
     working_dir: /app
     volumes:
-      - ./app:/app
-      - ./data:/app/data
+      - ./app:/app:Z
+      - ./data:/app/data:Z
     ports:
       - "5001:5000"
     environment:

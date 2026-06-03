@@ -65,19 +65,17 @@ uv sync
 
 **Note:** If you use _Docker_ instead of _Podman_ just replace the commands (`docker-compose` in place of `podman-compose`).
 
-5. Build all containers from the `InfoVis-Dashboard/` directory:
-
-```{bash}
-podman machine init
-```
-
-```{bash}
-podman machine start
-```
-
+5. Build all containers from the `InfoVis-Dashboard/` directory. For Linux users:
 
 ```{bash}
 podman-compose up --build
+```
+
+For other OS users:
+
+```
+podman machine init
+podman machine start
 ```
 
 If the Neo4j database is empty it will take a moment to load the data.

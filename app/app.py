@@ -17,7 +17,8 @@ from src.world_bank import (
 
 from src.graph_layer import (
     get_country_graph,
-    get_jurisdictions
+    get_jurisdictions,
+    get_country_entities,
 )
 
 
@@ -70,6 +71,18 @@ def api_jurisdictions():
     limit = clamp_arg(request.args, "limit", 40 if not focus else 14, 5, 120 if not focus else 40)
 
     result = get_jurisdictions(focus=focus, limit=limit)
+    return jsonify(result)
+
+
+@app.route("/api/entities/<iso3>")
+def api_entities(iso3):
+    iso3 = (iso3 or "").strip().upper()
+
+    limit = clamp_arg(request.args, "limit", 200, 1, 500)
+    offset = clamp_arg(request.args, "offset", 0, 0, 20000)
+    q = (request.args.get("q") or "").strip() or None
+
+    result = get_country_entities(iso3=iso3, q=q, limit=limit, offset=offset)
     return jsonify(result)
 
 

@@ -5,6 +5,7 @@ import { buildNumericToIso3Map } from './js/isoNumeric.js';
 import { fetchConnectionCounts, fetchOutgoingCounts, fetchJurisdictions } from './js/api.js';
 import { createInfoPanel } from './js/infoPanel.js';
 import { createGraphPanel } from './js/graphPanel.js';
+import { createListPanel } from './js/listPanel.js';
 import { initWorldMap } from './js/map.js';
 
 // NOTE: d3 and topojson are loaded from CDN in index.html and exposed as globals.
@@ -62,9 +63,11 @@ const iso3Outgoing = await fetchOutgoingCounts();
 // Panels
 const infoPanel = createInfoPanel({ fmt });
 const graphPanel = createGraphPanel({ tooltip });
+const listPanel = createListPanel();
 
 infoPanel.clear();
 graphPanel.clear();
+listPanel.clear();
 
 // Map
 let arcReq = 0;
@@ -85,6 +88,9 @@ const worldMap = await initWorldMap({
 
     // Knowledge graph uses ISO3 from the map's numeric ids.
     graphPanel.loadEntityGraph(iso3, name);
+
+    // Entities list uses ISO3.
+    listPanel.loadEntities(iso3, name);
 
     // Country indicators use ISO2 from World Bank.
     // Don't await this so arcs/graph can update immediately; infoPanel handles cancellation.
@@ -111,5 +117,6 @@ const worldMap = await initWorldMap({
 
     infoPanel.clear();
     graphPanel.clear();
+    listPanel.clear();
   }
 });

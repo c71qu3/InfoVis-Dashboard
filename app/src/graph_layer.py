@@ -12,6 +12,24 @@ NEO4J_PASS = os.environ.get("NEO4J_PASSWORD", "password")
 
 NODE_TYPES = ("Entity", "Officer", "Intermediary", "Address")
 
+# Entity-list view (for the right-side "Entities List" panel)
+ENTITIES_QUERY = """
+MATCH (e:Entity)
+WHERE e.country_codes CONTAINS $iso3
+  AND ($q IS NULL OR $q = '' OR toLower(coalesce(e.name, '')) CONTAINS toLower($q))
+RETURN e.node_id AS id, e.name AS name
+ORDER BY toLower(coalesce(e.name, '')) ASC, id ASC
+SKIP $offset
+LIMIT $limit
+"""
+
+ENTITIES_COUNT_QUERY = """
+MATCH (e:Entity)
+WHERE e.country_codes CONTAINS $iso3
+  AND ($q IS NULL OR $q = '' OR toLower(coalesce(e.name, '')) CONTAINS toLower($q))
+RETURN count(e) AS total
+"""
+
 
 # Lazy, module-level driver
 _driver = None
@@ -148,6 +166,38 @@ def compute_jurisdiction_flows(driver):
             totals[x] = totals.get(x, 0) + w
             totals[y] = totals.get(y, 0) + w
     return pairs, totals
+
+
+def get_country_entities(iso3: str, q: str | None = None, limit: int = 200, offset: int = 0):
+    """List Entity nodes for a country (by ISO3 substring match).
+
+    Returns:
+      { items: [{id, name}], total, limit, offset }
+
+    If Neo4j is unavailable or iso3 invalid, returns empty items.
+    """
+
+    iso3 = (iso3 or "").strip().upper()
+    driver = _get_driver()
+
+    if driver is None or not re.match(r"^[A-Z]{3}$", iso3):
+        return {"items": [], "total": 0, "limit": limit, "offset": offset}
+
+    q = (q or "").strip()
+
+    try:
+        with driver.session() as session:
+            total_rec = session.run(ENTITIES_COUNT_QUERY, iso3=iso3, q=q).single()
+            total = int(total_rec["total"]) if total_rec and total_rec["total"] is not None else 0
+
+            items = []
+            for rec in session.run(ENTITIES_QUERY, iso3=iso3, q=q, limit=int(limit), offset=int(offset)):
+                items.append({"id": rec.get("id"), "name": rec.get("name") or str(rec.get("id"))})
+
+        return {"items": items, "total": total, "limit": limit, "offset": offset}
+    except Exception as e:
+        print(f"Entity list query failed for {iso3}: {e}")
+        return {"items": [], "total": 0, "limit": limit, "offset": offset, "error": "graph_unavailable"}
 
 
 def get_jurisdictions(focus=None, limit: int = 40):

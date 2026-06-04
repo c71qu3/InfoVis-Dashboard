@@ -50,3 +50,14 @@ export async function fetchJurisdictions(focus = null) {
   const url = focus ? `/api/jurisdictions?focus=${encodeURIComponent(focus)}` : '/api/jurisdictions';
   return await fetchJson(url);
 }
+
+export async function fetchEntities(iso3, { limit = 200, offset = 0, q = null } = {}) {
+  const params = new URLSearchParams();
+  if (limit != null) params.set('limit', String(limit));
+  if (offset != null) params.set('offset', String(offset));
+  if (q) params.set('q', q);
+
+  const qs = params.toString();
+  const url = qs ? `/api/entities/${encodeURIComponent(iso3)}?${qs}` : `/api/entities/${encodeURIComponent(iso3)}`;
+  return await fetchJson(url);
+}

@@ -61,3 +61,17 @@ export async function fetchEntities(iso3, { limit = 200, offset = 0, q = null } 
   const url = qs ? `/api/entities/${encodeURIComponent(iso3)}?${qs}` : `/api/entities/${encodeURIComponent(iso3)}`;
   return await fetchJson(url);
 }
+
+export async function fetchEntityFocusedGraph(entityId, { intermediaries = 6, per_i = 6, officers = 2 } = {}) {
+  const params = new URLSearchParams();
+  if (intermediaries != null) params.set('intermediaries', String(intermediaries));
+  if (per_i != null) params.set('per_i', String(per_i));
+  if (officers != null) params.set('officers', String(officers));
+
+  const qs = params.toString();
+  const url = qs
+    ? `/api/entity_graph/${encodeURIComponent(entityId)}?${qs}`
+    : `/api/entity_graph/${encodeURIComponent(entityId)}`;
+
+  return await fetchJson(url);
+}

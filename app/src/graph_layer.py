@@ -30,6 +30,49 @@ WHERE e.country_codes CONTAINS $iso3
 RETURN count(e) AS total
 """
 
+# Entity-focused graph view (when clicking an entity in the list)
+ENTITY_EXISTS_QUERY = """
+MATCH (e:Entity)
+WHERE toString(e.node_id) = toString($entity_id)
+RETURN e.node_id AS id, e.name AS name
+LIMIT 1
+"""
+
+ENTITY_FOCUS_GRAPH_QUERY = """
+MATCH (e:Entity)
+WHERE toString(e.node_id) = toString($entity_id)
+CALL {
+    WITH e
+    OPTIONAL MATCH (e)-[:intermediary_of]-(i:Intermediary)
+    RETURN i
+    ORDER BY toLower(coalesce(i.name,'')) ASC
+    LIMIT $intermediaries
+}
+CALL {
+    WITH i
+    OPTIONAL MATCH (i)-[:intermediary_of]-(e2:Entity)
+    RETURN e2
+    LIMIT $entities_per_intermediary
+}
+CALL {
+    WITH e2
+    OPTIONAL MATCH (e2)-[:officer_of]-(o:Officer)
+    RETURN o
+    LIMIT $officers_per_entity
+}
+WITH collect(DISTINCT e) + collect(DISTINCT i) + collect(DISTINCT e2) + collect(DISTINCT o) AS ns
+UNWIND ns AS n
+WITH n WHERE n IS NOT NULL
+WITH collect(DISTINCT n) AS nodes
+UNWIND nodes AS x
+MATCH (x)-[r]-(y:Node)
+WHERE y IN nodes
+RETURN DISTINCT elementId(r) AS eid, type(r) AS rel,
+       startNode(r).node_id AS r_start, endNode(r).node_id AS r_end,
+       startNode(r).node_id AS s_id, labels(startNode(r)) AS s_labels, startNode(r).name AS s_name,
+       endNode(r).node_id AS t_id, labels(endNode(r)) AS t_labels, endNode(r).name AS t_name
+"""
+
 
 # Lazy, module-level driver
 _driver = None
@@ -198,6 +241,82 @@ def get_country_entities(iso3: str, q: str | None = None, limit: int = 200, offs
     except Exception as e:
         print(f"Entity list query failed for {iso3}: {e}")
         return {"items": [], "total": 0, "limit": limit, "offset": offset, "error": "graph_unavailable"}
+
+
+def get_entity_graph(entity_id: str, intermediaries: int = 6, entities_per_intermediary: int = 6, officers_per_entity: int = 2):
+    """Return a small graph centered on a single Entity (node_id).
+
+    Returns the same shape as get_country_graph: {nodes: [...], links: [...]}.
+    """
+
+    driver = _get_driver()
+    if driver is None:
+        return {"nodes": [], "links": []}
+
+    entity_id = (entity_id or "").strip()
+    if not entity_id:
+        return {"nodes": [], "links": []}
+
+    # Ensure the entity exists (and get a label) even if it has no relationships.
+    try:
+        with driver.session() as session:
+            base = session.run(ENTITY_EXISTS_QUERY, entity_id=entity_id).single()
+            if not base:
+                return {"nodes": [], "links": []}
+
+            base_node = {
+                "id": base["id"],
+                "label": base["name"] or str(base["id"]),
+                "type": "Entity",
+                "degree": 0,
+            }
+
+            nodes, links, seen = {}, [], set()
+            rows = list(
+                session.run(
+                    ENTITY_FOCUS_GRAPH_QUERY,
+                    entity_id=entity_id,
+                    intermediaries=int(intermediaries),
+                    entities_per_intermediary=int(entities_per_intermediary),
+                    officers_per_entity=int(officers_per_entity),
+                )
+            )
+
+            if not rows:
+                return {"nodes": [base_node], "links": []}
+
+            for rec in rows:
+                for nid, labels, name in (
+                    (rec["s_id"], rec["s_labels"], rec["s_name"]),
+                    (rec["t_id"], rec["t_labels"], rec["t_name"]),
+                ):
+                    if nid not in nodes:
+                        nodes[nid] = {
+                            "id": nid,
+                            "label": name or str(nid),
+                            "type": node_type(labels),
+                            "degree": 0,
+                        }
+
+                if rec["eid"] not in seen:
+                    seen.add(rec["eid"])
+                    links.append({"source": rec["r_start"], "target": rec["r_end"], "rel": rec["rel"]})
+
+    except Exception as e:
+        print(f"Entity-focused graph query failed for {entity_id}: {e}")
+        return {"nodes": [], "links": [], "error": "graph_unavailable"}
+
+    for l in links:
+        for end in ("source", "target"):
+            if l[end] in nodes:
+                nodes[l[end]]["degree"] += 1
+
+    # Ensure the focused entity is present in nodes.
+    if base_node["id"] not in nodes:
+        nodes[base_node["id"]] = base_node
+
+    return {"nodes": list(nodes.values()), "links": links}
+
 
 
 def get_jurisdictions(focus=None, limit: int = 40):

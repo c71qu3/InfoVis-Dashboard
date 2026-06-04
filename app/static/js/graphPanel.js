@@ -1,4 +1,4 @@
-import { fetchEntityGraph, fetchJurisdictions } from './api.js';
+import { fetchEntityGraph, fetchEntityFocusedGraph, fetchJurisdictions } from './api.js';
 
 const TYPE_COLORS = {
   Entity: '#4f8ef7',
@@ -118,7 +118,48 @@ export function createGraphPanel({ tooltip }) {
     renderEntityGraph(data);
   }
 
-  function renderEntityGraph(data) {
+  async function loadEntityFocusGraph(entityId, entityName = '') {
+    const token = ++graphReq;
+
+    const id = (entityId ?? '').toString().trim();
+    if (!id) {
+      graphHint.style.display = '';
+      graphHint.textContent = 'No entity selected.';
+      return;
+    }
+
+    graphHint.style.display = '';
+    graphHint.textContent = `Loading graph for ${entityName || 'entity'}…`;
+
+    let data;
+    try {
+      data = await fetchEntityFocusedGraph(id);
+    } catch (e) {
+      if (token !== graphReq) return;
+      console.warn(e);
+      graphHint.textContent = 'Error loading entity graph.';
+      return;
+    }
+
+    if (token !== graphReq) return;
+
+    if (data?.error) {
+      clear();
+      graphHint.textContent = 'Graph database unavailable.';
+      return;
+    }
+
+    if (!data?.nodes || data.nodes.length === 0) {
+      clear();
+      graphHint.textContent = `No graph found for ${entityName || id}.`;
+      return;
+    }
+
+    graphHint.style.display = 'none';
+    renderEntityGraph(data, id);
+  }
+
+  function renderEntityGraph(data, focusId = null) {
     if (graphSim) graphSim.stop();
     ensureGraphSvg();
 
@@ -154,11 +195,15 @@ export function createGraphPanel({ tooltip }) {
       .attr('stroke-width', (d) => wScale(d.weight))
       .attr('stroke-opacity', (d) => oScale(d.weight));
 
+    const focus = focusId != null ? String(focusId) : null;
+
     const node = graphG.append('g').selectAll('circle')
       .data(nodes).join('circle')
       .attr('class', 'gnode')
       .attr('r', (d) => rScale(d.degree))
       .attr('fill', (d) => TYPE_COLORS[d.type] || TYPE_COLORS.Node)
+      .attr('stroke', (d) => (focus && String(d.id) === focus ? '#fff' : '#0f1117'))
+      .attr('stroke-width', (d) => (focus && String(d.id) === focus ? 2.2 : 1))
       .call(nodeDrag())
       .on('mouseover', (e, d) => tooltip.show(e, `${d.label} · ${d.type}${d.degree ? ` · ${d.degree} links` : ''}`))
       .on('mousemove', tooltip.move)
@@ -308,6 +353,7 @@ export function createGraphPanel({ tooltip }) {
   return {
     clear,
     loadEntityGraph,
+    loadEntityFocusGraph,
     loadJurisdictionFlows
   };
 }

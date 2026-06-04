@@ -19,6 +19,7 @@ from src.graph_layer import (
     get_country_graph,
     get_jurisdictions,
     get_country_entities,
+    get_entity_graph,
 )
 
 
@@ -71,6 +72,21 @@ def api_jurisdictions():
     limit = clamp_arg(request.args, "limit", 40 if not focus else 14, 5, 120 if not focus else 40)
 
     result = get_jurisdictions(focus=focus, limit=limit)
+    return jsonify(result)
+
+
+@app.route("/api/entity_graph/<entity_id>")
+def api_entity_graph(entity_id):
+    intermediaries = clamp_arg(request.args, "intermediaries", 6, 1, 25)
+    per_i = clamp_arg(request.args, "per_i", 6, 1, 25)
+    officers = clamp_arg(request.args, "officers", 2, 0, 10)
+
+    result = get_entity_graph(
+        entity_id=entity_id,
+        intermediaries=intermediaries,
+        entities_per_intermediary=per_i,
+        officers_per_entity=officers,
+    )
     return jsonify(result)
 
 

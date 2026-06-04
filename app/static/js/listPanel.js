@@ -1,6 +1,6 @@
 import { fetchEntities } from './api.js';
 
-export function createListPanel() {
+export function createListPanel({ onSelectEntity } = {}) {
   const statusEl = document.getElementById('entities-status');
   const summaryEl = document.getElementById('entities-summary');
   const listEl = document.getElementById('entities-list');
@@ -35,11 +35,14 @@ export function createListPanel() {
     summaryEl.textContent = `${countryName} · ${shownTxt} of ${totalTxt} entities`;
   }
 
+  let selectedEntityId = null;
+
   function clearList() {
     if (listEl) listEl.innerHTML = '';
     if (loadMoreBtn) loadMoreBtn.style.display = 'none';
     currentOffset = 0;
     currentTotal = 0;
+    selectedEntityId = null;
   }
 
   function clear() {
@@ -61,10 +64,19 @@ export function createListPanel() {
       const row = document.createElement('button');
       row.type = 'button';
       row.className = 'entity-item';
-      row.title = it?.id ? `node_id: ${it.id}` : '';
 
+      const id = it?.id != null ? String(it.id) : '';
       const name = (it?.name || '').trim();
-      row.textContent = name || (it?.id != null ? String(it.id) : '(unnamed)');
+      const label = name || (it?.id != null ? String(it.id) : '(unnamed)');
+
+      row.dataset.entityId = id;
+      row.dataset.entityName = label;
+      row.title = id ? `node_id: ${id}` : '';
+      row.textContent = label;
+
+      if (selectedEntityId && id && selectedEntityId === id) {
+        row.classList.add('selected');
+      }
 
       frag.appendChild(row);
     }
@@ -147,6 +159,24 @@ export function createListPanel() {
       } finally {
         loadMoreBtn.disabled = false;
       }
+    });
+  }
+
+  if (listEl) {
+    listEl.addEventListener('click', (e) => {
+      const btn = e.target?.closest?.('button.entity-item');
+      if (!btn) return;
+
+      const entityId = btn.dataset.entityId || '';
+      const entityName = btn.dataset.entityName || btn.textContent || '';
+      if (!entityId) return;
+
+      // UI selected state
+      selectedEntityId = entityId;
+      for (const el of listEl.querySelectorAll('button.entity-item.selected')) el.classList.remove('selected');
+      btn.classList.add('selected');
+
+      if (typeof onSelectEntity === 'function') onSelectEntity(entityId, entityName);
     });
   }
 

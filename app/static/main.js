@@ -63,7 +63,9 @@ const iso3Outgoing = await fetchOutgoingCounts();
 // Panels
 const infoPanel = createInfoPanel({ fmt });
 const graphPanel = createGraphPanel({ tooltip });
-const listPanel = createListPanel();
+const listPanel = createListPanel({
+  onSelectEntity: (entityId, entityName) => graphPanel.loadEntityFocusGraph(entityId, entityName)
+});
 
 infoPanel.clear();
 graphPanel.clear();

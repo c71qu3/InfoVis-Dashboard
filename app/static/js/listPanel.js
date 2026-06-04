@@ -1,6 +1,6 @@
-import { fetchEntities } from './api.js';
+import { fetchIntermediaries } from './api.js';
 
-export function createListPanel({ onSelectEntity } = {}) {
+export function createListPanel({ onSelectIntermediary, onSelectEntity } = {}) {
   const statusEl = document.getElementById('entities-status');
   const summaryEl = document.getElementById('entities-summary');
   const listEl = document.getElementById('entities-list');
@@ -32,17 +32,17 @@ export function createListPanel({ onSelectEntity } = {}) {
 
     const totalTxt = Number(total).toLocaleString();
     const shownTxt = Number(shown).toLocaleString();
-    summaryEl.textContent = `${countryName} · ${shownTxt} of ${totalTxt} entities`;
+    summaryEl.textContent = `${countryName} · ${shownTxt} of ${totalTxt} intermediaries`;
   }
 
-  let selectedEntityId = null;
+  let selectedIntermediaryId = null;
 
   function clearList() {
     if (listEl) listEl.innerHTML = '';
     if (loadMoreBtn) loadMoreBtn.style.display = 'none';
     currentOffset = 0;
     currentTotal = 0;
-    selectedEntityId = null;
+    selectedIntermediaryId = null;
   }
 
   function clear() {
@@ -51,7 +51,7 @@ export function createListPanel({ onSelectEntity } = {}) {
     currentCountryName = '';
     setSummary({ countryName: null });
     clearList();
-    setStatus('Select a country to view its entities.');
+    setStatus('Select a country to view its intermediaries.');
   }
 
   function renderItems(items, { append = false } = {}) {
@@ -63,18 +63,18 @@ export function createListPanel({ onSelectEntity } = {}) {
     for (const it of (items || [])) {
       const row = document.createElement('button');
       row.type = 'button';
-      row.className = 'entity-item';
+      row.className = 'entity-item'; // keep existing CSS
 
       const id = it?.id != null ? String(it.id) : '';
       const name = (it?.name || '').trim();
       const label = name || (it?.id != null ? String(it.id) : '(unnamed)');
 
-      row.dataset.entityId = id;
-      row.dataset.entityName = label;
+      row.dataset.intermediaryId = id;
+      row.dataset.intermediaryName = label;
       row.title = id ? `node_id: ${id}` : '';
       row.textContent = label;
 
-      if (selectedEntityId && id && selectedEntityId === id) {
+      if (selectedIntermediaryId && id && selectedIntermediaryId === id) {
         row.classList.add('selected');
       }
 
@@ -89,11 +89,11 @@ export function createListPanel({ onSelectEntity } = {}) {
 
     let data;
     try {
-      data = await fetchEntities(currentIso3, { limit: pageSize, offset: currentOffset });
+      data = await fetchIntermediaries(currentIso3, { limit: pageSize, offset: currentOffset });
     } catch (e) {
       if (token !== req) return;
-      console.warn('Could not load entities', e);
-      setStatus('Error loading entities.');
+      console.warn('Could not load intermediaries', e);
+      setStatus('Error loading intermediaries.');
       if (loadMoreBtn) loadMoreBtn.style.display = 'none';
       return;
     }
@@ -113,7 +113,7 @@ export function createListPanel({ onSelectEntity } = {}) {
     if (isFirst && items.length === 0) {
       clearList();
       setSummary({ countryName: currentCountryName, total: currentTotal, shown: 0 });
-      setStatus('No entities found for this country.');
+      setStatus('No intermediaries found for this country.');
       return;
     }
 
@@ -128,7 +128,7 @@ export function createListPanel({ onSelectEntity } = {}) {
     if (loadMoreBtn) loadMoreBtn.style.display = hasMore ? 'block' : 'none';
   }
 
-  async function loadEntities(iso3, countryName = '') {
+  async function loadIntermediaries(iso3, countryName = '') {
     const token = ++req;
 
     currentIso3 = iso3;
@@ -144,11 +144,14 @@ export function createListPanel({ onSelectEntity } = {}) {
       return;
     }
 
-    setStatus('Loading entities…');
+    setStatus('Loading intermediaries…');
     setSummary({ countryName: currentCountryName, total: null, shown: null });
 
     await loadNextPage(token);
   }
+
+  // Backwards-compatible alias (older callers still call loadEntities)
+  const loadEntities = loadIntermediaries;
 
   if (loadMoreBtn) {
     loadMoreBtn.addEventListener('click', async () => {
@@ -167,16 +170,18 @@ export function createListPanel({ onSelectEntity } = {}) {
       const btn = e.target?.closest?.('button.entity-item');
       if (!btn) return;
 
-      const entityId = btn.dataset.entityId || '';
-      const entityName = btn.dataset.entityName || btn.textContent || '';
-      if (!entityId) return;
+      const intermediaryId = btn.dataset.intermediaryId || '';
+      const intermediaryName = btn.dataset.intermediaryName || btn.textContent || '';
+      if (!intermediaryId) return;
 
       // UI selected state
-      selectedEntityId = entityId;
+      selectedIntermediaryId = intermediaryId;
       for (const el of listEl.querySelectorAll('button.entity-item.selected')) el.classList.remove('selected');
       btn.classList.add('selected');
 
-      if (typeof onSelectEntity === 'function') onSelectEntity(entityId, entityName);
+      // Prefer the new intermediary callback; fall back to the old entity callback if provided.
+      if (typeof onSelectIntermediary === 'function') onSelectIntermediary(intermediaryId, intermediaryName, currentIso3);
+      else if (typeof onSelectEntity === 'function') onSelectEntity(intermediaryId, intermediaryName);
     });
   }
 
@@ -184,6 +189,7 @@ export function createListPanel({ onSelectEntity } = {}) {
 
   return {
     clear,
-    loadEntities
+    loadIntermediaries,
+    loadEntities,
   };
 }

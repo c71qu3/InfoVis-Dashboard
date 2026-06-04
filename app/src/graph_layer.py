@@ -30,6 +30,24 @@ WHERE e.country_codes CONTAINS $iso3
 RETURN count(e) AS total
 """
 
+# Intermediary-list view (for the right-side list panel)
+INTERMEDIARIES_QUERY = """
+MATCH (i:Intermediary)-[:intermediary_of]-(e:Entity)
+WHERE e.country_codes CONTAINS $iso3
+  AND ($q IS NULL OR $q = '' OR toLower(coalesce(i.name, '')) CONTAINS toLower($q))
+RETURN DISTINCT i.node_id AS id, i.name AS name
+ORDER BY toLower(coalesce(name, '')) ASC, id ASC
+SKIP $offset
+LIMIT $limit
+"""
+
+INTERMEDIARIES_COUNT_QUERY = """
+MATCH (i:Intermediary)-[:intermediary_of]-(e:Entity)
+WHERE e.country_codes CONTAINS $iso3
+  AND ($q IS NULL OR $q = '' OR toLower(coalesce(i.name, '')) CONTAINS toLower($q))
+RETURN count(DISTINCT i) AS total
+"""
+
 # Entity-focused graph view (when clicking an entity in the list)
 ENTITY_EXISTS_QUERY = """
 MATCH (e:Entity)
@@ -61,6 +79,44 @@ CALL {
     LIMIT $officers_per_entity
 }
 WITH collect(DISTINCT e) + collect(DISTINCT i) + collect(DISTINCT e2) + collect(DISTINCT o) AS ns
+UNWIND ns AS n
+WITH n WHERE n IS NOT NULL
+WITH collect(DISTINCT n) AS nodes
+UNWIND nodes AS x
+MATCH (x)-[r]-(y:Node)
+WHERE y IN nodes
+RETURN DISTINCT elementId(r) AS eid, type(r) AS rel,
+       startNode(r).node_id AS r_start, endNode(r).node_id AS r_end,
+       startNode(r).node_id AS s_id, labels(startNode(r)) AS s_labels, startNode(r).name AS s_name,
+       endNode(r).node_id AS t_id, labels(endNode(r)) AS t_labels, endNode(r).name AS t_name
+"""
+
+# Intermediary-focused graph view (when clicking an intermediary in the list)
+INTERMEDIARY_EXISTS_QUERY = """
+MATCH (i:Intermediary)
+WHERE toString(i.node_id) = toString($intermediary_id)
+RETURN i.node_id AS id, i.name AS name
+LIMIT 1
+"""
+
+INTERMEDIARY_FOCUS_GRAPH_QUERY = """
+MATCH (i:Intermediary)
+WHERE toString(i.node_id) = toString($intermediary_id)
+CALL {
+    WITH i
+    MATCH (i)-[:intermediary_of]-(e:Entity)
+    WHERE ($iso3 IS NULL OR $iso3 = '' OR e.country_codes CONTAINS $iso3)
+    RETURN e
+    ORDER BY toLower(coalesce(e.name,'')) ASC
+    LIMIT $entities
+}
+CALL {
+    WITH e
+    OPTIONAL MATCH (e)-[:officer_of]-(o:Officer)
+    RETURN o
+    LIMIT $officers_per_entity
+}
+WITH collect(DISTINCT i) + collect(DISTINCT e) + collect(DISTINCT o) AS ns
 UNWIND ns AS n
 WITH n WHERE n IS NOT NULL
 WITH collect(DISTINCT n) AS nodes
@@ -243,6 +299,38 @@ def get_country_entities(iso3: str, q: str | None = None, limit: int = 200, offs
         return {"items": [], "total": 0, "limit": limit, "offset": offset, "error": "graph_unavailable"}
 
 
+def get_country_intermediaries(iso3: str, q: str | None = None, limit: int = 200, offset: int = 0):
+    """List Intermediary nodes connected to a country's entities (by ISO3 substring match).
+
+    Returns:
+      { items: [{id, name}], total, limit, offset }
+
+    If Neo4j is unavailable or iso3 invalid, returns empty items.
+    """
+
+    iso3 = (iso3 or "").strip().upper()
+    driver = _get_driver()
+
+    if driver is None or not re.match(r"^[A-Z]{3}$", iso3):
+        return {"items": [], "total": 0, "limit": limit, "offset": offset}
+
+    q = (q or "").strip()
+
+    try:
+        with driver.session() as session:
+            total_rec = session.run(INTERMEDIARIES_COUNT_QUERY, iso3=iso3, q=q).single()
+            total = int(total_rec["total"]) if total_rec and total_rec["total"] is not None else 0
+
+            items = []
+            for rec in session.run(INTERMEDIARIES_QUERY, iso3=iso3, q=q, limit=int(limit), offset=int(offset)):
+                items.append({"id": rec.get("id"), "name": rec.get("name") or str(rec.get("id"))})
+
+        return {"items": items, "total": total, "limit": limit, "offset": offset}
+    except Exception as e:
+        print(f"Intermediary list query failed for {iso3}: {e}")
+        return {"items": [], "total": 0, "limit": limit, "offset": offset, "error": "graph_unavailable"}
+
+
 def get_entity_graph(entity_id: str, intermediaries: int = 6, entities_per_intermediary: int = 6, officers_per_entity: int = 2):
     """Return a small graph centered on a single Entity (node_id).
 
@@ -312,6 +400,86 @@ def get_entity_graph(entity_id: str, intermediaries: int = 6, entities_per_inter
                 nodes[l[end]]["degree"] += 1
 
     # Ensure the focused entity is present in nodes.
+    if base_node["id"] not in nodes:
+        nodes[base_node["id"]] = base_node
+
+    return {"nodes": list(nodes.values()), "links": links}
+
+
+def get_intermediary_graph(intermediary_id: str, iso3: str | None = None, entities: int = 12, officers_per_entity: int = 2):
+    """Return a small graph centered on a single Intermediary (node_id).
+
+    If iso3 is provided (AAA), the Entity expansion is filtered to that country's entities.
+
+    Returns the same shape as get_country_graph: {nodes: [...], links: [...]}.
+    """
+
+    driver = _get_driver()
+    if driver is None:
+        return {"nodes": [], "links": []}
+
+    intermediary_id = (intermediary_id or "").strip()
+    if not intermediary_id:
+        return {"nodes": [], "links": []}
+
+    iso3 = (iso3 or "").strip().upper()
+    iso3 = iso3 if re.match(r"^[A-Z]{3}$", iso3) else None
+
+    # Ensure the intermediary exists (and get a label) even if it has no relationships.
+    try:
+        with driver.session() as session:
+            base = session.run(INTERMEDIARY_EXISTS_QUERY, intermediary_id=intermediary_id).single()
+            if not base:
+                return {"nodes": [], "links": []}
+
+            base_node = {
+                "id": base["id"],
+                "label": base["name"] or str(base["id"]),
+                "type": "Intermediary",
+                "degree": 0,
+            }
+
+            nodes, links, seen = {}, [], set()
+            rows = list(
+                session.run(
+                    INTERMEDIARY_FOCUS_GRAPH_QUERY,
+                    intermediary_id=intermediary_id,
+                    iso3=iso3,
+                    entities=int(entities),
+                    officers_per_entity=int(officers_per_entity),
+                )
+            )
+
+            if not rows:
+                return {"nodes": [base_node], "links": []}
+
+            for rec in rows:
+                for nid, labels, name in (
+                    (rec["s_id"], rec["s_labels"], rec["s_name"]),
+                    (rec["t_id"], rec["t_labels"], rec["t_name"]),
+                ):
+                    if nid not in nodes:
+                        nodes[nid] = {
+                            "id": nid,
+                            "label": name or str(nid),
+                            "type": node_type(labels),
+                            "degree": 0,
+                        }
+
+                if rec["eid"] not in seen:
+                    seen.add(rec["eid"])
+                    links.append({"source": rec["r_start"], "target": rec["r_end"], "rel": rec["rel"]})
+
+    except Exception as e:
+        print(f"Intermediary-focused graph query failed for {intermediary_id}: {e}")
+        return {"nodes": [], "links": [], "error": "graph_unavailable"}
+
+    for l in links:
+        for end in ("source", "target"):
+            if l[end] in nodes:
+                nodes[l[end]]["degree"] += 1
+
+    # Ensure the focused intermediary is present in nodes.
     if base_node["id"] not in nodes:
         nodes[base_node["id"]] = base_node
 

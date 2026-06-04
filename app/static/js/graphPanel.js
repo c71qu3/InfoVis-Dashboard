@@ -1,4 +1,4 @@
-import { fetchEntityGraph, fetchEntityFocusedGraph, fetchJurisdictions } from './api.js';
+import { fetchEntityGraph, fetchEntityFocusedGraph, fetchIntermediaryFocusedGraph, fetchJurisdictions } from './api.js';
 
 const TYPE_COLORS = {
   Entity: '#4f8ef7',
@@ -152,6 +152,47 @@ export function createGraphPanel({ tooltip }) {
     if (!data?.nodes || data.nodes.length === 0) {
       clear();
       graphHint.textContent = `No graph found for ${entityName || id}.`;
+      return;
+    }
+
+    graphHint.style.display = 'none';
+    renderEntityGraph(data, id);
+  }
+
+  async function loadIntermediaryFocusGraph(intermediaryId, intermediaryName = '', iso3 = null) {
+    const token = ++graphReq;
+
+    const id = (intermediaryId ?? '').toString().trim();
+    if (!id) {
+      graphHint.style.display = '';
+      graphHint.textContent = 'No intermediary selected.';
+      return;
+    }
+
+    graphHint.style.display = '';
+    graphHint.textContent = `Loading graph for ${intermediaryName || 'intermediary'}…`;
+
+    let data;
+    try {
+      data = await fetchIntermediaryFocusedGraph(id, { iso3 });
+    } catch (e) {
+      if (token !== graphReq) return;
+      console.warn(e);
+      graphHint.textContent = 'Error loading intermediary graph.';
+      return;
+    }
+
+    if (token !== graphReq) return;
+
+    if (data?.error) {
+      clear();
+      graphHint.textContent = 'Graph database unavailable.';
+      return;
+    }
+
+    if (!data?.nodes || data.nodes.length === 0) {
+      clear();
+      graphHint.textContent = `No graph found for ${intermediaryName || id}.`;
       return;
     }
 
@@ -354,6 +395,7 @@ export function createGraphPanel({ tooltip }) {
     clear,
     loadEntityGraph,
     loadEntityFocusGraph,
+    loadIntermediaryFocusGraph,
     loadJurisdictionFlows
   };
 }

@@ -64,7 +64,7 @@ const iso3Outgoing = await fetchOutgoingCounts();
 const infoPanel = createInfoPanel({ fmt });
 const graphPanel = createGraphPanel({ tooltip });
 const listPanel = createListPanel({
-  onSelectEntity: (entityId, entityName) => graphPanel.loadEntityFocusGraph(entityId, entityName)
+  onSelectIntermediary: (intermediaryId, intermediaryName, iso3) => graphPanel.loadIntermediaryFocusGraph(intermediaryId, intermediaryName, iso3)
 });
 
 infoPanel.clear();
@@ -91,8 +91,8 @@ const worldMap = await initWorldMap({
     // Knowledge graph uses ISO3 from the map's numeric ids.
     graphPanel.loadEntityGraph(iso3, name);
 
-    // Entities list uses ISO3.
-    listPanel.loadEntities(iso3, name);
+    // Intermediaries list uses ISO3.
+    listPanel.loadIntermediaries(iso3, name);
 
     // Country indicators use ISO2 from World Bank.
     // Don't await this so arcs/graph can update immediately; infoPanel handles cancellation.

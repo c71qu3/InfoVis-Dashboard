@@ -62,6 +62,20 @@ export async function fetchEntities(iso3, { limit = 200, offset = 0, q = null } 
   return await fetchJson(url);
 }
 
+// Intermediary list view (for the right-side list panel)
+export async function fetchIntermediaries(iso3, { limit = 200, offset = 0, q = null } = {}) {
+  const params = new URLSearchParams();
+  if (limit != null) params.set('limit', String(limit));
+  if (offset != null) params.set('offset', String(offset));
+  if (q) params.set('q', q);
+
+  const qs = params.toString();
+  const url = qs
+    ? `/api/intermediaries/${encodeURIComponent(iso3)}?${qs}`
+    : `/api/intermediaries/${encodeURIComponent(iso3)}`;
+  return await fetchJson(url);
+}
+
 export async function fetchEntityFocusedGraph(entityId, { intermediaries = 6, per_i = 6, officers = 2 } = {}) {
   const params = new URLSearchParams();
   if (intermediaries != null) params.set('intermediaries', String(intermediaries));
@@ -72,6 +86,20 @@ export async function fetchEntityFocusedGraph(entityId, { intermediaries = 6, pe
   const url = qs
     ? `/api/entity_graph/${encodeURIComponent(entityId)}?${qs}`
     : `/api/entity_graph/${encodeURIComponent(entityId)}`;
+
+  return await fetchJson(url);
+}
+
+export async function fetchIntermediaryFocusedGraph(intermediaryId, { iso3 = null, entities = 12, officers = 2 } = {}) {
+  const params = new URLSearchParams();
+  if (iso3) params.set('iso3', String(iso3));
+  if (entities != null) params.set('entities', String(entities));
+  if (officers != null) params.set('officers', String(officers));
+
+  const qs = params.toString();
+  const url = qs
+    ? `/api/intermediary_graph/${encodeURIComponent(intermediaryId)}?${qs}`
+    : `/api/intermediary_graph/${encodeURIComponent(intermediaryId)}`;
 
   return await fetchJson(url);
 }

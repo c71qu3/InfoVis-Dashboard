@@ -19,7 +19,9 @@ from src.graph_layer import (
     get_country_graph,
     get_jurisdictions,
     get_country_entities,
+    get_country_intermediaries,
     get_entity_graph,
+    get_intermediary_graph,
 )
 
 
@@ -90,6 +92,23 @@ def api_entity_graph(entity_id):
     return jsonify(result)
 
 
+@app.route("/api/intermediary_graph/<intermediary_id>")
+def api_intermediary_graph(intermediary_id):
+    # Optional: filter entity expansion by country
+    iso3 = (request.args.get("iso3") or "").strip().upper() or None
+
+    entities = clamp_arg(request.args, "entities", 12, 1, 80)
+    officers = clamp_arg(request.args, "officers", 2, 0, 10)
+
+    result = get_intermediary_graph(
+        intermediary_id=intermediary_id,
+        iso3=iso3,
+        entities=entities,
+        officers_per_entity=officers,
+    )
+    return jsonify(result)
+
+
 @app.route("/api/entities/<iso3>")
 def api_entities(iso3):
     iso3 = (iso3 or "").strip().upper()
@@ -99,6 +118,18 @@ def api_entities(iso3):
     q = (request.args.get("q") or "").strip() or None
 
     result = get_country_entities(iso3=iso3, q=q, limit=limit, offset=offset)
+    return jsonify(result)
+
+
+@app.route("/api/intermediaries/<iso3>")
+def api_intermediaries(iso3):
+    iso3 = (iso3 or "").strip().upper()
+
+    limit = clamp_arg(request.args, "limit", 200, 1, 500)
+    offset = clamp_arg(request.args, "offset", 0, 0, 20000)
+    q = (request.args.get("q") or "").strip() or None
+
+    result = get_country_intermediaries(iso3=iso3, q=q, limit=limit, offset=offset)
     return jsonify(result)
 
 

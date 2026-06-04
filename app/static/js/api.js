@@ -14,6 +14,17 @@ export async function fetchConnectionCounts() {
   }
 }
 
+export async function fetchOutgoingCounts() {
+  try {
+    const data = await fetchJson('/api/outgoing_connections');
+    console.log('Loaded outgoing edge counts for', Object.keys(data || {}).length, 'codes');
+    return data || {};
+  } catch (e) {
+    console.warn('Could not load outgoing edge counts', e);
+    return {};
+  }
+}
+
 export async function fetchYears(iso2) {
   try {
     return await fetchJson(`/api/years/${iso2}`);

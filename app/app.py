@@ -3,7 +3,8 @@ import re
 from pathlib import Path
 
 from src.app_utils import (
-    count_connections,
+    count_connections_iso3,
+    count_outgoing_crossborder_edges_iso3,
     clamp_arg
 )
 
@@ -12,7 +13,6 @@ from src.world_bank import (
     fetch_latest_all,
     fetch_year_all,
     get_available_years,
-    iso3_to_iso2,
 )
 
 from src.graph_layer import (
@@ -27,14 +27,23 @@ DATA_DIR = Path("static/data")
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 
 
-# pre‑compute counts
-connection_counts = count_connections(DATA_DIR, iso3_to_iso2)
-print(f"Loaded {len(connection_counts)} country codes with connection counts")
+# Pre-compute:
+# - raw appearance counts (ISO3 -> count)
+# - outgoing cross-border edges (ISO3 -> count) for clickability
+connection_counts = count_connections_iso3(DATA_DIR)
+outgoing_counts = count_outgoing_crossborder_edges_iso3(DATA_DIR)
+print(f"Loaded {len(connection_counts)} ISO3 codes with connection counts")
+print(f"Loaded {len(outgoing_counts)} ISO3 codes with intermediary-linked entity edges")
 
 
 @app.route("/api/connections")
 def api_connections():
     return jsonify(connection_counts)
+
+
+@app.route("/api/outgoing_connections")
+def api_outgoing_connections():
+    return jsonify(outgoing_counts)
 
 
 @app.route("/api/graph/<iso3>")

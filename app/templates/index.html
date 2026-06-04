@@ -17,6 +17,10 @@
       --text:     #d4daf0;
       --muted:    #6b7a99;
       --selected: #f7a24f;
+
+      /* Map styling */
+      --no-network:       #6a5256; /* reddish grey */
+      --no-network-hover: #7a6166;
     }
 
     body {
@@ -97,11 +101,8 @@
 }
 
     .country.has-data {
-      fill: #1e3a5f;
       cursor: pointer;
     }
-
-    .country.has-data:hover { fill: #2a5080; }
 
     .country.selected {
       fill: var(--selected) !important;
@@ -131,7 +132,16 @@
     .country:hover {
       stroke: #9d9b9a;
       stroke-width: 1.5px;
-      cursor: pointer;
+    }
+
+    .country.no-network {
+      fill: var(--no-network) !important;
+      cursor: not-allowed;
+    }
+
+    .country.no-network:hover {
+      fill: var(--no-network-hover) !important;
+      cursor: not-allowed;
     }
 
     #country-name {

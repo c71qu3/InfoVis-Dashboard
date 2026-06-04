@@ -2,7 +2,7 @@ import { fmt } from './js/utils.js';
 import { initTooltip } from './js/tooltip.js';
 import { createIso2Resolver } from './js/countryCodes.js';
 import { buildNumericToIso3Map } from './js/isoNumeric.js';
-import { fetchConnectionCounts, fetchJurisdictions } from './js/api.js';
+import { fetchConnectionCounts, fetchOutgoingCounts, fetchJurisdictions } from './js/api.js';
 import { createInfoPanel } from './js/infoPanel.js';
 import { createGraphPanel } from './js/graphPanel.js';
 import { initWorldMap } from './js/map.js';
@@ -53,7 +53,11 @@ const getIso2ForCountryName = createIso2Resolver(nameToIso2);
 const numericToIso3 = await buildNumericToIso3Map('/static/data/iso_numeric.json');
 
 // Load offshore connection counts (for choropleth colouring)
-const iso2Counts = await fetchConnectionCounts();
+// Backend returns ISO3 → count.
+const iso3Counts = await fetchConnectionCounts();
+
+// Load outgoing cross-border edge counts (for clickability)
+const iso3Outgoing = await fetchOutgoingCounts();
 
 // Panels
 const infoPanel = createInfoPanel({ fmt });
@@ -69,7 +73,8 @@ const worldMap = await initWorldMap({
   mapPanelId: 'map-panel',
   tooltip,
   getIso2ForCountryName,
-  iso2Counts,
+  iso3Counts,
+  iso3Outgoing,
   numericToIso3,
   iso3ToCapitalLonLat,
   onSelect: async ({ name, iso2, iso3 }) => {

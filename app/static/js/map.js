@@ -1,5 +1,5 @@
-function buildColorScale(iso2Counts) {
-  const countsArray = Object.values(iso2Counts || {}).filter((v) => v > 0);
+function buildColorScale(iso3Counts) {
+  const countsArray = Object.values(iso3Counts || {}).filter((v) => v > 0);
   const minCount = countsArray.length > 0 ? Math.min(...countsArray) : 1;
   const maxCount = countsArray.length > 0 ? Math.max(...countsArray) : 1;
 
@@ -72,21 +72,44 @@ export async function initWorldMap({
   mapPanelId = 'map-panel',
   tooltip,
   getIso2ForCountryName,
-  iso2Counts,
+  iso3Counts,
+  iso3Outgoing,
   numericToIso3,
   iso3ToCapitalLonLat,
   onSelect,
   onClear
 }) {
-  const { colorScale, countsArray, minCount, maxCount } = buildColorScale(iso2Counts);
+  const { colorScale, countsArray, minCount, maxCount } = buildColorScale(iso3Counts);
+
+  const NO_NETWORK_COLOR = '#6a5256'; // reddish grey
+
+  function getNetworkStatus(feature) {
+    const iso3 = numericToIso3?.get?.(String(feature?.id)) || null;
+
+    const rawCount = iso3 ? Number(iso3Counts?.[iso3] || 0) : 0;
+    const outgoingCount = iso3 ? Number(iso3Outgoing?.[iso3] || 0) : 0;
+
+    // Clickability is based on *outgoing cross-border edges*, not raw appearances.
+    const hasOutgoing = Boolean(iso3) && Number.isFinite(outgoingCount) && outgoingCount > 0;
+
+    return {
+      iso3,
+      rawCount: Number.isFinite(rawCount) ? rawCount : 0,
+      outgoingCount: Number.isFinite(outgoingCount) ? outgoingCount : 0,
+      hasOutgoing
+    };
+  }
 
   function getCountryColor(feature) {
-    const name = feature.properties?.name;
-    const iso2 = getIso2ForCountryName(name);
-    if (!iso2) return '#1e2a40';
-    const count = iso2Counts?.[iso2] || 0;
-    if (count === 0) return '#1e2a40';
-    return colorScale(count);
+    const { hasOutgoing, rawCount } = getNetworkStatus(feature);
+
+    // Grey out anything with no outgoing cross-border edges.
+    if (!hasOutgoing) return NO_NETWORK_COLOR;
+
+    // If it has outgoing edges but rawCount is 0, fall back to a neutral fill.
+    if (!rawCount) return '#1e2a40';
+
+    return colorScale(rawCount);
   }
 
   const world = await d3.json(topoJsonUrl);
@@ -274,7 +297,9 @@ export async function initWorldMap({
     .join('path')
     .attr('class', 'country')
     .attr('d', pathGen)
-    .attr('fill', (d) => getCountryColor(d));
+    .attr('fill', (d) => getCountryColor(d))
+    .classed('has-data', (d) => getNetworkStatus(d).hasOutgoing)
+    .classed('no-network', (d) => !getNetworkStatus(d).hasOutgoing);
 
   function handleResize() {
     const newW = mapEl.clientWidth;
@@ -317,13 +342,15 @@ export async function initWorldMap({
 
   paths
     .on('mouseover', (e, d) => {
-      let tipText = d.properties?.name || `ID: ${d.id}`;
-      const iso2 = getIso2ForCountryName(d.properties?.name);
-      if (iso2) {
-        const count = iso2Counts?.[iso2] || 0;
-        if (count > 0) tipText += ` (${count} offshore links)`;
+      const countryName = d.properties?.name || `ID: ${d.id}`;
+      const { hasOutgoing, rawCount } = getNetworkStatus(d);
+
+      if (!hasOutgoing) {
+        tooltip.show(e, `No offshore network for ${countryName}`);
+        return;
       }
-      tooltip.show(e, tipText);
+
+      tooltip.show(e, `${countryName} (${rawCount} offshore links)`);
     })
     .on('mousemove', tooltip.move)
     .on('mouseout', tooltip.hide)
@@ -333,8 +360,14 @@ export async function initWorldMap({
       const countryName = d.properties?.name;
       if (!countryName) return;
 
+      const { iso3, hasOutgoing } = getNetworkStatus(d);
       const iso2 = getIso2ForCountryName(countryName);
-      const iso3 = numericToIso3?.get(String(d.id));
+
+      // Only allow selecting countries that have outgoing cross-border edges.
+      if (!hasOutgoing) {
+        tooltip.show(e, `No offshore network for ${countryName}`);
+        return;
+      }
 
       if (selectedId === d.id) {
         selectedId = null;

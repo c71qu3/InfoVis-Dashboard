@@ -221,16 +221,40 @@ export async function initWorldMap({
     if (drawable.length === 0) return;
 
     const maxW = d3.max(drawable, (d) => d.weight) || 1;
-    const wScale = d3.scaleLinear().domain([1, maxW]).range([1.2, 6]);
 
-    arcsG
-      .selectAll('path')
+    // Make arcs easier to hover by:
+    // 1) enforcing a minimum visible stroke width
+    // 2) adding a thicker invisible "hit" stroke for pointer events
+    const visibleWScale = d3.scaleLinear().domain([1, maxW]).range([2, 7]);
+
+    const arcWrap = arcsG
+      .selectAll('g.juris-arc-wrap')
       .data(drawable, (d) => `${focus}-${d.other}`)
-      .join('path')
-      .attr('class', 'juris-arc')
+      .join((enter) => {
+        const g = enter.append('g').attr('class', 'juris-arc-wrap');
+        g.append('path').attr('class', 'juris-arc');
+        g.append('path').attr('class', 'juris-arc-hit');
+        return g;
+      });
+
+    // Visible arc (force full opacity; color comes from CSS)
+    // NOTE: use inline style so it overrides the stylesheet rule (.juris-arc { stroke-opacity: ... })
+    arcWrap
+      .select('path.juris-arc')
+      .style('stroke-opacity', 1)
+      .attr('stroke-width', (d) => visibleWScale(d.weight))
+      .attr('d', (d) => arcPath(d.src, d.dst));
+
+    // Invisible hover target (doesn't change visuals, just makes it easier to hit)
+    arcWrap
+      .select('path.juris-arc-hit')
+      .attr('fill', 'none')
+      .attr('stroke', 'transparent')
+      .attr('stroke-linecap', 'round')
+      .attr('vector-effect', 'non-scaling-stroke')
       // allow hovering/clicking only on the stroke so the map remains usable
       .attr('pointer-events', 'stroke')
-      .attr('stroke-width', (d) => wScale(d.weight))
+      .attr('stroke-width', (d) => Math.max(12, visibleWScale(d.weight) * 3))
       .attr('d', (d) => arcPath(d.src, d.dst))
       .on('mouseover', (e, d) => {
         const w = Number(d.weight) || 0;

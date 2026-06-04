@@ -257,6 +257,21 @@
       display: none;
       z-index: 999;
     }
+
+    /* Responsive layout for smaller screens */
+    @media (max-width: 900px) {
+      body {
+        grid-template-columns: 1fr;
+        grid-template-rows: 42px 50vh auto 60vh;
+      }
+
+      #map-panel { grid-column: 1; grid-row: 2; }
+      #info-panel { grid-column: 1; grid-row: 3; }
+      #graph-panel { grid-column: 1; grid-row: 4; }
+
+      /* Hide the placeholder list panel on small screens to free space */
+      #list-panel { display: none; }
+    }
   </style>
 </head>
 <body>

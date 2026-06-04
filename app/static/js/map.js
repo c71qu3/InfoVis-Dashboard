@@ -22,7 +22,9 @@ function renderLegend({ svg, W, minCount, maxCount, countsArray }) {
 
   const legendWidth = 120;
   const legendHeight = 10;
-  const legendSvg = svg.append('g').attr('transform', `translate(${W - legendWidth - 20}, 20)`);
+  const legendSvg = svg.append('g')
+    .attr('class', 'map-legend')
+    .attr('transform', `translate(${W - legendWidth - 20}, 20)`);
 
   legendSvg
     .append('text')
@@ -91,8 +93,8 @@ export async function initWorldMap({
   const features = topojson.feature(world, world.objects.countries).features;
 
   const mapEl = document.getElementById(mapPanelId);
-  const W = mapEl.clientWidth;
-  const H = mapEl.clientHeight;
+  let W = mapEl.clientWidth;
+  let H = mapEl.clientHeight;
 
   const projection = d3.geoNaturalEarth1().fitSize([W, H], { type: 'Sphere' });
   const pathGen = d3.geoPath().projection(projection);
@@ -101,20 +103,26 @@ export async function initWorldMap({
   // Prefer capital coordinates (World Bank), fall back to polygon centroid.
   // Map: ISO3 -> [x,y] in screen coordinates (before zoom/pan transforms).
   const iso3ToXY = new Map();
-  for (const f of features) {
-    const iso3 = numericToIso3?.get(String(f.id));
-    if (!iso3) continue;
 
-    // d3 expects [lon, lat]
-    const capitalLonLat = iso3ToCapitalLonLat?.get?.(iso3);
-    const ll = (capitalLonLat && capitalLonLat.length === 2)
-      ? capitalLonLat
-      : d3.geoCentroid(f);
+  function recomputeIso3ToXY() {
+    iso3ToXY.clear();
+    for (const f of features) {
+      const iso3 = numericToIso3?.get(String(f.id));
+      if (!iso3) continue;
 
-    const xy = projection(ll);
-    if (!xy || !Number.isFinite(xy[0]) || !Number.isFinite(xy[1])) continue;
-    iso3ToXY.set(iso3, xy);
+      // d3 expects [lon, lat]
+      const capitalLonLat = iso3ToCapitalLonLat?.get?.(iso3);
+      const ll = (capitalLonLat && capitalLonLat.length === 2)
+        ? capitalLonLat
+        : d3.geoCentroid(f);
+
+      const xy = projection(ll);
+      if (!xy || !Number.isFinite(xy[0]) || !Number.isFinite(xy[1])) continue;
+      iso3ToXY.set(iso3, xy);
+    }
   }
+
+  recomputeIso3ToXY();
 
   const svg = d3.select(`#${mapPanelId}`).append('svg').attr('viewBox', `0 0 ${W} ${H}`);
   const zoomG = svg.append('g');
@@ -128,6 +136,12 @@ export async function initWorldMap({
 
   renderLegend({ svg, W, minCount, maxCount, countsArray });
 
+  function updateLegendPosition() {
+    // Keep legend pinned to top-right.
+    svg.select('.map-legend')
+      .attr('transform', `translate(${W - 120 - 20}, 20)`);
+  }
+
   let selectedId = null;
 
   // Overlay layer for jurisdiction arcs (rendered on top of countries)
@@ -135,8 +149,13 @@ export async function initWorldMap({
     .append('g')
     .attr('class', 'juris-arcs');
 
+  let lastJurisData = null;
+  let lastJurisFocus = null;
+
   function clearJurisdictionArcs() {
     arcsG.selectAll('*').remove();
+    lastJurisData = null;
+    lastJurisFocus = null;
   }
 
   function arcPath([x1, y1], [x2, y2]) {
@@ -159,10 +178,18 @@ export async function initWorldMap({
   }
 
   function renderJurisdictionArcs(jurisData, focusIso3 = null) {
-    clearJurisdictionArcs();
+    // Clear current arcs but keep the last data so we can re-render on resize.
+    arcsG.selectAll('*').remove();
 
     const focus = (focusIso3 || jurisData?.focus || '').trim().toUpperCase();
-    if (!focus) return;
+    if (!focus) {
+      lastJurisData = null;
+      lastJurisFocus = null;
+      return;
+    }
+
+    lastJurisData = jurisData;
+    lastJurisFocus = focus;
 
     const src = iso3ToXY.get(focus);
     if (!src) return;
@@ -224,6 +251,42 @@ export async function initWorldMap({
     .attr('class', 'country')
     .attr('d', pathGen)
     .attr('fill', (d) => getCountryColor(d));
+
+  function handleResize() {
+    const newW = mapEl.clientWidth;
+    const newH = mapEl.clientHeight;
+    if (!newW || !newH) return;
+    if (newW === W && newH === H) return;
+
+    W = newW;
+    H = newH;
+
+    svg.attr('viewBox', `0 0 ${W} ${H}`);
+
+    projection.fitSize([W, H], { type: 'Sphere' });
+    // pathGen references the projection object, so updating the projection is enough.
+    paths.attr('d', pathGen);
+
+    recomputeIso3ToXY();
+
+    zoom.translateExtent([[0, 0], [W, H]]);
+    svg.call(zoom);
+
+    updateLegendPosition();
+
+    if (lastJurisData && lastJurisFocus) {
+      renderJurisdictionArcs(lastJurisData, lastJurisFocus);
+    }
+  }
+
+  // Keep the map responsive to panel resizes (browser resize / responsive layout).
+  if (typeof ResizeObserver !== 'undefined') {
+    const resizeObserver = new ResizeObserver(handleResize);
+    resizeObserver.observe(mapEl);
+  } else {
+    // Fallback for older browsers
+    window.addEventListener('resize', handleResize);
+  }
 
   // Ensure arcs render above countries.
   arcsG.raise();

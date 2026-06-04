@@ -7,7 +7,11 @@ export function createInfoPanel({ fmt }) {
   const gridEl = document.getElementById('indicators-grid');
   const hintEl = document.getElementById('info-hint');
 
+  // Request token to keep the panel responsive when users click quickly.
+  let infoReq = 0;
+
   function clear() {
+    infoReq++; // invalidate any in-flight load
     nameEl.textContent = 'Click a country on the map';
     nameEl.classList.add('empty');
     gridEl.innerHTML = '';
@@ -25,6 +29,8 @@ export function createInfoPanel({ fmt }) {
   }
 
   async function loadCountry(name, iso2) {
+    const token = ++infoReq;
+
     nameEl.textContent = name;
     nameEl.classList.remove('empty');
     gridEl.innerHTML = '';
@@ -32,6 +38,7 @@ export function createInfoPanel({ fmt }) {
     loadingEl.classList.add('active');
 
     const years = await fetchYears(iso2);
+    if (token !== infoReq) return;
 
     // (re)build year selector
     const existing = document.getElementById('year-selector');
@@ -51,22 +58,27 @@ export function createInfoPanel({ fmt }) {
 
     const dropdown = document.getElementById('year-dropdown');
 
-    await loadIndicatorsIntoGrid(iso2, 'latest');
+    await loadIndicatorsIntoGrid(iso2, 'latest', token);
+    if (token !== infoReq) return;
     loadingEl.classList.remove('active');
 
     dropdown.addEventListener('change', async (e) => {
+      if (token !== infoReq) return;
       loadingEl.classList.add('active');
       gridEl.innerHTML = '';
-      await loadIndicatorsIntoGrid(iso2, e.target.value);
+      await loadIndicatorsIntoGrid(iso2, e.target.value, token);
+      if (token !== infoReq) return;
       loadingEl.classList.remove('active');
     });
   }
 
-  async function loadIndicatorsIntoGrid(iso2, yearMode) {
+  async function loadIndicatorsIntoGrid(iso2, yearMode, token) {
     try {
       const data = await fetchIndicators(iso2, yearMode);
+      if (token !== infoReq) return;
       renderIndicators(data);
     } catch (err) {
+      if (token !== infoReq) return;
       console.warn(err);
       hintEl.textContent = 'Error loading indicators.';
       hintEl.style.display = '';

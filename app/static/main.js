@@ -1,6 +1,6 @@
 import { fmt } from './js/utils.js';
 import { initTooltip } from './js/tooltip.js';
-import { buildNameToIso2Map, createIso2Resolver } from './js/countryCodes.js';
+import { createIso2Resolver } from './js/countryCodes.js';
 import { buildNumericToIso3Map } from './js/isoNumeric.js';
 import { fetchConnectionCounts, fetchJurisdictions } from './js/api.js';
 import { createInfoPanel } from './js/infoPanel.js';
@@ -11,34 +11,46 @@ import { initWorldMap } from './js/map.js';
 
 const tooltip = initTooltip('tooltip');
 
-// Build country-code lookup tables
-const nameToIso2 = await buildNameToIso2Map();
-const getIso2ForCountryName = createIso2Resolver(nameToIso2);
-const numericToIso3 = await buildNumericToIso3Map('/static/data/iso_numeric.json');
+// Build country-code lookup tables (single World Bank request)
+async function buildWorldBankMaps() {
+  const nameToIso2 = new Map();
+  const iso3ToCapitalLonLat = new Map();
 
-async function buildIso3ToCapitalLonLatMap() {
-  const m = new Map();
   try {
     const wbRes = await fetch('https://api.worldbank.org/v2/country?format=json&per_page=300');
     const wbData = await wbRes.json();
+
     if (wbData?.[1]) {
       for (const c of wbData[1]) {
+        const iso2 = c?.iso2Code;
         const iso3 = c?.id;
+
+        // Name → ISO2 (for indicators)
+        if (iso2 && /^[A-Z]{2}$/.test(iso2) && c?.capitalCity) {
+          nameToIso2.set(c.name, iso2);
+        }
+
+        // ISO3 → capital lon/lat (for arcs)
         const lon = parseFloat(c?.longitude);
         const lat = parseFloat(c?.latitude);
         if (iso3 && /^[A-Z]{3}$/.test(iso3) && Number.isFinite(lon) && Number.isFinite(lat)) {
-          m.set(iso3, [lon, lat]);
+          iso3ToCapitalLonLat.set(iso3, [lon, lat]);
         }
       }
     }
-    console.log('Built ISO3 → capital lon/lat map with', m.size, 'entries');
+
+    console.log('Built name→ISO2 map with', nameToIso2.size, 'entries');
+    console.log('Built ISO3 → capital lon/lat map with', iso3ToCapitalLonLat.size, 'entries');
   } catch (e) {
-    console.warn('Could not build capital coordinate map', e);
+    console.warn('Could not load World Bank country metadata', e);
   }
-  return m;
+
+  return { nameToIso2, iso3ToCapitalLonLat };
 }
 
-const iso3ToCapitalLonLat = await buildIso3ToCapitalLonLatMap();
+const { nameToIso2, iso3ToCapitalLonLat } = await buildWorldBankMaps();
+const getIso2ForCountryName = createIso2Resolver(nameToIso2);
+const numericToIso3 = await buildNumericToIso3Map('/static/data/iso_numeric.json');
 
 // Load offshore connection counts (for choropleth colouring)
 const iso2Counts = await fetchConnectionCounts();
@@ -70,8 +82,9 @@ const worldMap = await initWorldMap({
     graphPanel.loadEntityGraph(iso3, name);
 
     // Country indicators use ISO2 from World Bank.
+    // Don't await this so arcs/graph can update immediately; infoPanel handles cancellation.
     if (iso2) {
-      await infoPanel.loadCountry(name, iso2);
+      infoPanel.loadCountry(name, iso2);
     } else {
       infoPanel.showNoData(name);
     }

@@ -61,7 +61,7 @@ uv venv
 uv sync
 ```
 
-4. Run `filter_data.ipynb` notebook to unpack ZIP file.
+4. Run `filter_data.ipynb` notebook or `filter_data.py` script to unpack ZIP file.
 
 **Note:** If you use _Docker_ instead of _Podman_ just replace the commands (`docker-compose` in place of `podman-compose`).
 

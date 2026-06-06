@@ -144,6 +144,63 @@
       cursor: not-allowed;
     }
 
+    #country-search { position: relative; }
+
+    #country-search-input {
+      width: 100%;
+      background: #1a2133;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.78rem;
+      letter-spacing: 0.03em;
+      padding: 0.45rem 0.6rem;
+      outline: none;
+    }
+
+    #country-search-input:focus { border-color: var(--accent); }
+    #country-search-input::placeholder { color: var(--muted); }
+
+    #country-search-results {
+      display: none;
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0; right: 0;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      max-height: 220px;
+      overflow-y: auto;
+      z-index: 20;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+    }
+
+    .country-search-item {
+      display: block;
+      width: 100%;
+      text-align: left;
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.74rem;
+      padding: 0.4rem 0.6rem;
+      cursor: pointer;
+    }
+
+    .country-search-item:hover,
+    .country-search-item.active {
+      background: #1a2133;
+      color: var(--accent2);
+    }
+
+    .country-search-empty {
+      padding: 0.45rem 0.6rem;
+      color: var(--muted);
+      font-size: 0.72rem;
+    }
+
     #country-name {
       font-size: 1.4rem;
       letter-spacing: 0.06em;
@@ -367,7 +424,11 @@
 <!-- INFO -->
 <div class="panel" id="info-panel">
   <div class="panel-label">Country Info</div>
-  <div id="country-name" class="empty">Click a country on the map</div>
+  <div id="country-search">
+    <input id="country-search-input" type="text" placeholder="Search for a country…" autocomplete="off" spellcheck="false" />
+    <div id="country-search-results"></div>
+  </div>
+  <div id="country-name" class="empty">Click a country on the map, or search above</div>
   <div id="loading-indicator">Loading indicators…</div>
   <div id="indicators-grid"></div>
   <div id="info-hint">Select a country to view World Bank indicators.</div>

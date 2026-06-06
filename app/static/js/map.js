@@ -340,6 +340,25 @@ export async function initWorldMap({
   // Ensure arcs render above countries.
   arcsG.raise();
 
+  // Shared selection logic used by both map clicks and the country search box.
+  async function applySelection(d) {
+    const countryName = d.properties?.name;
+    if (!countryName) return false;
+
+    const { iso3, hasOutgoing } = getNetworkStatus(d);
+    if (!hasOutgoing) return false;
+
+    const iso2 = getIso2ForCountryName(countryName);
+
+    selectedId = d.id;
+    paths.classed('selected', (f) => f.id === d.id);
+
+    if (onSelect) {
+      await onSelect({ id: d.id, name: countryName, iso2, iso3 });
+    }
+    return true;
+  }
+
   paths
     .on('mouseover', (e, d) => {
       const countryName = d.properties?.name || `ID: ${d.id}`;
@@ -360,8 +379,7 @@ export async function initWorldMap({
       const countryName = d.properties?.name;
       if (!countryName) return;
 
-      const { iso3, hasOutgoing } = getNetworkStatus(d);
-      const iso2 = getIso2ForCountryName(countryName);
+      const { hasOutgoing } = getNetworkStatus(d);
 
       // Only allow selecting countries that have outgoing cross-border edges.
       if (!hasOutgoing) {
@@ -369,6 +387,7 @@ export async function initWorldMap({
         return;
       }
 
+      // Toggle off if clicking the already-selected country.
       if (selectedId === d.id) {
         selectedId = null;
         paths.classed('selected', false);
@@ -377,12 +396,7 @@ export async function initWorldMap({
         return;
       }
 
-      selectedId = d.id;
-      paths.classed('selected', (f) => f.id === d.id);
-
-      if (onSelect) {
-        await onSelect({ id: d.id, name: countryName, iso2, iso3 });
-      }
+      await applySelection(d);
     });
 
   svg.on('click', () => {
@@ -398,6 +412,35 @@ export async function initWorldMap({
       paths.classed('selected', false);
       clearJurisdictionArcs();
     },
+
+    // Selectable countries (those with an offshore network), for the search box.
+    getSelectableCountries() {
+      const seen = new Set();
+      const list = [];
+      for (const f of features) {
+        const name = f.properties?.name;
+        const { iso3, hasOutgoing } = getNetworkStatus(f);
+        if (!hasOutgoing || !name || !iso3 || seen.has(iso3)) continue;
+        seen.add(iso3);
+        list.push({ id: f.id, name, iso2: getIso2ForCountryName(name), iso3 });
+      }
+      return list;
+    },
+
+    // Programmatically select a country by ISO3 (used by the search box).
+    async selectCountryByIso3(iso3) {
+      const target = String(iso3 || '').trim().toUpperCase();
+      if (!target) return false;
+
+      const d = features.find((f) => {
+        const s = getNetworkStatus(f);
+        return s.hasOutgoing && s.iso3 === target;
+      });
+      if (!d) return false;
+
+      return await applySelection(d);
+    },
+
     renderJurisdictionArcs,
     clearJurisdictionArcs
   };

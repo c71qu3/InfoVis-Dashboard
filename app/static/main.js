@@ -6,6 +6,7 @@ import { fetchConnectionCounts, fetchOutgoingCounts, fetchJurisdictions } from '
 import { createInfoPanel } from './js/infoPanel.js';
 import { createGraphPanel } from './js/graphPanel.js';
 import { createListPanel } from './js/listPanel.js';
+import { createCountrySearch } from './js/countrySearch.js';
 import { initWorldMap } from './js/map.js';
 
 // NOTE: d3 and topojson are loaded from CDN in index.html and exposed as globals.
@@ -73,6 +74,7 @@ listPanel.clear();
 
 // Map
 let arcReq = 0;
+let countrySearch = null; // assigned after the map is built; cleared on deselect
 const worldMap = await initWorldMap({
   topoJsonUrl: '/static/data/world-topo.json',
   mapPanelId: 'map-panel',
@@ -120,5 +122,14 @@ const worldMap = await initWorldMap({
     infoPanel.clear();
     graphPanel.clear();
     listPanel.clear();
+    countrySearch?.clear();
   }
+});
+
+// Search-to-select: pick a country by name when it's hard to click on the map.
+countrySearch = createCountrySearch({
+  inputId: 'country-search-input',
+  resultsId: 'country-search-results',
+  countries: worldMap.getSelectableCountries(),
+  onSelect: (c) => worldMap.selectCountryByIso3(c.iso3)
 });

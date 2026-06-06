@@ -12,7 +12,7 @@ export function createInfoPanel({ fmt }) {
 
   function clear() {
     infoReq++; // invalidate any in-flight load
-    nameEl.textContent = 'Click a country on the map';
+    nameEl.textContent = 'Click a country on the map, or search above';
     nameEl.classList.add('empty');
     gridEl.innerHTML = '';
     hintEl.style.display = '';

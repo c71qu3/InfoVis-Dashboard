@@ -65,7 +65,8 @@ const iso3Outgoing = await fetchOutgoingCounts();
 const infoPanel = createInfoPanel({ fmt });
 const graphPanel = createGraphPanel({ tooltip });
 const listPanel = createListPanel({
-  onSelectIntermediary: (intermediaryId, intermediaryName, iso3) => graphPanel.loadIntermediaryFocusGraph(intermediaryId, intermediaryName, iso3)
+  onSelectIntermediary: (intermediaryId, intermediaryName, iso3) => graphPanel.loadIntermediaryFocusGraph(intermediaryId, intermediaryName, iso3),
+  onSelectEntity: (entityId, entityName) => graphPanel.loadEntityFocusGraph(entityId, entityName)
 });
 
 infoPanel.clear();

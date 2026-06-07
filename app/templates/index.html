@@ -308,6 +308,31 @@
       overflow: hidden;
     }
 
+    #entities-controls {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    #entities-search,
+    #entities-type {
+      background: #1a2133;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.78rem;
+      letter-spacing: 0.03em;
+      padding: 0.45rem 0.6rem;
+      outline: none;
+    }
+
+    #entities-search { flex: 1; min-width: 0; }
+    #entities-type { cursor: pointer; }
+
+    #entities-search:focus,
+    #entities-type:focus { border-color: var(--accent); }
+    #entities-search::placeholder { color: var(--muted); }
+
     #entities-summary {
       color: var(--accent2);
       font-size: 0.85rem;
@@ -448,6 +473,15 @@
 <!-- LIST -->
 <div class="panel" id="list-panel">
   <div class="panel-label">Intermediaries List</div>
+  <div id="entities-controls">
+    <input id="entities-search" type="text" placeholder="Search names…" autocomplete="off" spellcheck="false" />
+    <select id="entities-type">
+      <option value="all">All</option>
+      <option value="entity">Entity</option>
+      <option value="officer">Officer</option>
+      <option value="intermediary">Intermediary</option>
+    </select>
+  </div>
   <div id="entities-summary"></div>
   <div id="entities-status">Select a country to view its intermediaries.</div>
   <div id="entities-list"></div>

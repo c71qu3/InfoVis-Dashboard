@@ -48,6 +48,29 @@ WHERE e.country_codes CONTAINS $iso3
 RETURN count(DISTINCT i) AS total
 """
 
+# Unified country node list (search + type filter for the right-side list panel).
+# `$type` is one of 'all' | 'entity' | 'officer' | 'intermediary'.
+# Per-type MATCH clauses; combined with UNION for 'all'.
+_NODE_MATCH_CLAUSES = {
+    "entity": "MATCH (n:Entity) WHERE n.country_codes CONTAINS $iso3",
+    "intermediary": "MATCH (n:Intermediary)-[:intermediary_of]-(e:Entity) WHERE e.country_codes CONTAINS $iso3",
+    "officer": "MATCH (n:Officer)-[:officer_of]-(e:Entity) WHERE e.country_codes CONTAINS $iso3",
+}
+
+_NODE_TYPE_EXPR = "head([l IN labels(n) WHERE l <> 'Node']) AS type"
+
+
+def _build_node_match(node_type: str) -> str:
+    """Cypher that binds `n` to the nodes of the requested type for a country.
+
+    Always ends with `WITH DISTINCT n` so a name-filter WHERE can be chained after it.
+    """
+    if node_type in _NODE_MATCH_CLAUSES:
+        return f"{_NODE_MATCH_CLAUSES[node_type]} WITH DISTINCT n"
+    # 'all' — union of every supported type
+    parts = [f"{clause} RETURN n" for clause in _NODE_MATCH_CLAUSES.values()]
+    return "CALL {\n" + "\nUNION\n".join(parts) + "\n} WITH DISTINCT n"
+
 # Entity-focused graph view (when clicking an entity in the list)
 ENTITY_EXISTS_QUERY = """
 MATCH (e:Entity)
@@ -328,6 +351,54 @@ def get_country_intermediaries(iso3: str, q: str | None = None, limit: int = 200
         return {"items": items, "total": total, "limit": limit, "offset": offset}
     except Exception as e:
         print(f"Intermediary list query failed for {iso3}: {e}")
+        return {"items": [], "total": 0, "limit": limit, "offset": offset, "error": "graph_unavailable"}
+
+
+def get_country_nodes(iso3: str, q: str | None = None, node_type: str = "all", limit: int = 200, offset: int = 0):
+    """List nodes for a country, searchable by name and filtered by type.
+
+    `node_type` is one of 'all' | 'entity' | 'officer' | 'intermediary'.
+    Returns: { items: [{id, name, type}], total, limit, offset }.
+    Degrades to empty items if Neo4j is unavailable or iso3 is invalid.
+    """
+
+    iso3 = (iso3 or "").strip().upper()
+    node_type = (node_type or "all").strip().lower()
+    if node_type not in _NODE_MATCH_CLAUSES and node_type != "all":
+        node_type = "all"
+
+    driver = _get_driver()
+    if driver is None or not re.match(r"^[A-Z]{3}$", iso3):
+        return {"items": [], "total": 0, "limit": limit, "offset": offset}
+
+    q = (q or "").strip()
+
+    match = _build_node_match(node_type)
+    name_filter = "WHERE ($q = '' OR toLower(coalesce(n.name, '')) CONTAINS toLower($q))"
+    list_query = (
+        f"{match}\n{name_filter}\n"
+        f"RETURN n.node_id AS id, n.name AS name, {_NODE_TYPE_EXPR}\n"
+        "ORDER BY toLower(coalesce(name, '')) ASC, id ASC\n"
+        "SKIP $offset LIMIT $limit"
+    )
+    count_query = f"{match}\n{name_filter}\nRETURN count(n) AS total"
+
+    try:
+        with driver.session() as session:
+            total_rec = session.run(count_query, iso3=iso3, q=q).single()
+            total = int(total_rec["total"]) if total_rec and total_rec["total"] is not None else 0
+
+            items = []
+            for rec in session.run(list_query, iso3=iso3, q=q, limit=int(limit), offset=int(offset)):
+                items.append({
+                    "id": rec.get("id"),
+                    "name": rec.get("name") or str(rec.get("id")),
+                    "type": rec.get("type"),
+                })
+
+        return {"items": items, "total": total, "limit": limit, "offset": offset}
+    except Exception as e:
+        print(f"Country node list query failed for {iso3} ({node_type}): {e}")
         return {"items": [], "total": 0, "limit": limit, "offset": offset, "error": "graph_unavailable"}
 
 

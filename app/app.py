@@ -20,6 +20,7 @@ from src.graph_layer import (
     get_jurisdictions,
     get_country_entities,
     get_country_intermediaries,
+    get_country_nodes,
     get_entity_graph,
     get_intermediary_graph,
 )
@@ -128,8 +129,9 @@ def api_intermediaries(iso3):
     limit = clamp_arg(request.args, "limit", 200, 1, 500)
     offset = clamp_arg(request.args, "offset", 0, 0, 20000)
     q = (request.args.get("q") or "").strip() or None
+    node_type = (request.args.get("type") or "all").strip().lower()
 
-    result = get_country_intermediaries(iso3=iso3, q=q, limit=limit, offset=offset)
+    result = get_country_nodes(iso3=iso3, q=q, node_type=node_type, limit=limit, offset=offset)
     return jsonify(result)
 
 

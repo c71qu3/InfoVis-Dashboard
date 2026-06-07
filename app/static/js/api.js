@@ -63,11 +63,12 @@ export async function fetchEntities(iso3, { limit = 200, offset = 0, q = null } 
 }
 
 // Intermediary list view (for the right-side list panel)
-export async function fetchIntermediaries(iso3, { limit = 200, offset = 0, q = null } = {}) {
+export async function fetchIntermediaries(iso3, { limit = 200, offset = 0, q = null, type = null } = {}) {
   const params = new URLSearchParams();
   if (limit != null) params.set('limit', String(limit));
   if (offset != null) params.set('offset', String(offset));
   if (q) params.set('q', q);
+  if (type && type !== 'all') params.set('type', type);
 
   const qs = params.toString();
   const url = qs

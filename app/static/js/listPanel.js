@@ -5,13 +5,25 @@ export function createListPanel({ onSelectIntermediary, onSelectEntity } = {}) {
   const summaryEl = document.getElementById('entities-summary');
   const listEl = document.getElementById('entities-list');
   const loadMoreBtn = document.getElementById('entities-load-more');
+  const searchEl = document.getElementById('entities-search');
+  const typeEl = document.getElementById('entities-type');
 
   let req = 0;
   let currentIso3 = null;
   let currentCountryName = '';
   let currentOffset = 0;
   let currentTotal = 0;
+  let currentQuery = '';
+  let currentType = 'all';
   const pageSize = 200;
+
+  // Plural noun used in the summary line, depending on the selected type.
+  const TYPE_NOUN = {
+    all: 'results',
+    entity: 'entities',
+    officer: 'officers',
+    intermediary: 'intermediaries',
+  };
 
   function setStatus(text) {
     if (statusEl) statusEl.textContent = text;
@@ -32,7 +44,8 @@ export function createListPanel({ onSelectIntermediary, onSelectEntity } = {}) {
 
     const totalTxt = Number(total).toLocaleString();
     const shownTxt = Number(shown).toLocaleString();
-    summaryEl.textContent = `${countryName} · ${shownTxt} of ${totalTxt} intermediaries`;
+    const noun = TYPE_NOUN[currentType] || 'results';
+    summaryEl.textContent = `${countryName} · ${shownTxt} of ${totalTxt} ${noun}`;
   }
 
   let selectedIntermediaryId = null;
@@ -71,6 +84,7 @@ export function createListPanel({ onSelectIntermediary, onSelectEntity } = {}) {
 
       row.dataset.intermediaryId = id;
       row.dataset.intermediaryName = label;
+      row.dataset.nodeType = (it?.type || '').toLowerCase();
       row.title = id ? `node_id: ${id}` : '';
       row.textContent = label;
 
@@ -89,11 +103,16 @@ export function createListPanel({ onSelectIntermediary, onSelectEntity } = {}) {
 
     let data;
     try {
-      data = await fetchIntermediaries(currentIso3, { limit: pageSize, offset: currentOffset });
+      data = await fetchIntermediaries(currentIso3, {
+        limit: pageSize,
+        offset: currentOffset,
+        q: currentQuery || null,
+        type: currentType,
+      });
     } catch (e) {
       if (token !== req) return;
-      console.warn('Could not load intermediaries', e);
-      setStatus('Error loading intermediaries.');
+      console.warn('Could not load list', e);
+      setStatus('Error loading results.');
       if (loadMoreBtn) loadMoreBtn.style.display = 'none';
       return;
     }
@@ -113,7 +132,7 @@ export function createListPanel({ onSelectIntermediary, onSelectEntity } = {}) {
     if (isFirst && items.length === 0) {
       clearList();
       setSummary({ countryName: currentCountryName, total: currentTotal, shown: 0 });
-      setStatus('No intermediaries found for this country.');
+      setStatus(currentQuery ? 'No matches for your search.' : 'No results for this country.');
       return;
     }
 
@@ -144,14 +163,42 @@ export function createListPanel({ onSelectIntermediary, onSelectEntity } = {}) {
       return;
     }
 
-    setStatus('Loading intermediaries…');
+    setStatus('Loading…');
     setSummary({ countryName: currentCountryName, total: null, shown: null });
 
     await loadNextPage(token);
   }
 
+  // Re-run the current query from the top (used by the search box / type filter).
+  async function reload() {
+    if (!currentIso3) return;
+    const token = ++req;
+    currentOffset = 0;
+    currentTotal = 0;
+    clearList();
+    setStatus('Loading…');
+    setSummary({ countryName: currentCountryName, total: null, shown: null });
+    await loadNextPage(token);
+  }
+
   // Backwards-compatible alias (older callers still call loadEntities)
   const loadEntities = loadIntermediaries;
+
+  if (searchEl) {
+    let debounce = null;
+    searchEl.addEventListener('input', () => {
+      currentQuery = searchEl.value.trim();
+      clearTimeout(debounce);
+      debounce = setTimeout(reload, 250);
+    });
+  }
+
+  if (typeEl) {
+    typeEl.addEventListener('change', () => {
+      currentType = typeEl.value || 'all';
+      reload();
+    });
+  }
 
   if (loadMoreBtn) {
     loadMoreBtn.addEventListener('click', async () => {
@@ -170,18 +217,24 @@ export function createListPanel({ onSelectIntermediary, onSelectEntity } = {}) {
       const btn = e.target?.closest?.('button.entity-item');
       if (!btn) return;
 
-      const intermediaryId = btn.dataset.intermediaryId || '';
-      const intermediaryName = btn.dataset.intermediaryName || btn.textContent || '';
-      if (!intermediaryId) return;
+      const nodeId = btn.dataset.intermediaryId || '';
+      const nodeName = btn.dataset.intermediaryName || btn.textContent || '';
+      const nodeType = btn.dataset.nodeType || '';
+      if (!nodeId) return;
 
       // UI selected state
-      selectedIntermediaryId = intermediaryId;
+      selectedIntermediaryId = nodeId;
       for (const el of listEl.querySelectorAll('button.entity-item.selected')) el.classList.remove('selected');
       btn.classList.add('selected');
 
-      // Prefer the new intermediary callback; fall back to the old entity callback if provided.
-      if (typeof onSelectIntermediary === 'function') onSelectIntermediary(intermediaryId, intermediaryName, currentIso3);
-      else if (typeof onSelectEntity === 'function') onSelectEntity(intermediaryId, intermediaryName);
+      // Open the focused graph that matches the clicked node's type.
+      if (nodeType === 'entity' && typeof onSelectEntity === 'function') {
+        onSelectEntity(nodeId, nodeName, currentIso3);
+      } else if (nodeType === 'intermediary' || !nodeType) {
+        if (typeof onSelectIntermediary === 'function') onSelectIntermediary(nodeId, nodeName, currentIso3);
+        else if (typeof onSelectEntity === 'function') onSelectEntity(nodeId, nodeName, currentIso3);
+      }
+      // Officers have no dedicated focus graph; selection highlights only.
     });
   }
 

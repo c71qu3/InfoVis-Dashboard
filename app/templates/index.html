@@ -280,6 +280,77 @@
       padding: 0 1.5rem;
     }
 
+    #graph-info-btn {
+      position: absolute;
+      top: 6px; right: 8px;
+      z-index: 11;
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: #1a2133;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 0.62rem;
+      font-style: italic;
+      line-height: 1;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+    }
+
+    #graph-info-btn:hover,
+    #graph-info-btn[aria-expanded="true"] {
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    #graph-info-popover {
+      position: absolute;
+      top: 28px; right: 8px;
+      z-index: 12;
+      width: 260px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.7rem 0.8rem;
+      box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5);
+    }
+
+    #graph-info-popover[hidden] { display: none; }
+
+    #graph-info-popover .gi-title {
+      font-size: 0.62rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text);
+      margin-bottom: 0.55rem;
+    }
+
+    #graph-info-popover .gi-source { color: var(--muted); }
+
+    #graph-info-popover dt {
+      display: flex;
+      align-items: center;
+      font-size: 0.72rem;
+      color: var(--text);
+      margin-bottom: 0.15rem;
+    }
+
+    #graph-info-popover dt i {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      margin-right: 6px;
+    }
+
+    #graph-info-popover dd {
+      font-size: 0.66rem;
+      line-height: 1.5;
+      color: var(--muted);
+      margin: 0 0 0.6rem 14px;
+    }
+
+    #graph-info-popover dd:last-child { margin-bottom: 0; }
+
     #graph-legend {
       position: absolute;
       bottom: 8px; left: 10px;
@@ -462,6 +533,18 @@
 <!-- GRAPH -->
 <div class="panel" id="graph-panel">
   <div class="panel-label">Knowledge Graph</div>
+  <button id="graph-info-btn" type="button" aria-label="What do the node types mean?" aria-expanded="false">i</button>
+  <div id="graph-info-popover" role="dialog" aria-label="Node type definitions" hidden>
+    <div class="gi-title">Node types <span class="gi-source">— ICIJ Offshore Leaks</span></div>
+    <dl>
+      <dt><i style="background:#4f8ef7"></i>Entity</dt>
+      <dd>A company, trust or fund created in a low-tax, offshore jurisdiction by an agent.</dd>
+      <dt><i style="background:#f7a24f"></i>Officer</dt>
+      <dd>A person or company who plays a role in an offshore entity — e.g. a director, shareholder or beneficiary.</dd>
+      <dt><i style="background:#5fd0a0"></i>Intermediary</dt>
+      <dd>A go-between who helps set up offshore entities — often a law firm or middleman that liaises with the offshore provider.</dd>
+    </dl>
+  </div>
   <div id="graph-legend">
     <span><i style="background:#4f8ef7"></i>Entity</span>
     <span><i style="background:#f7a24f"></i>Officer</span>

@@ -280,30 +280,36 @@
       padding: 0 1.5rem;
     }
 
-    #graph-info-btn {
+    #graph-info-btn,
+    #map-info-btn {
       position: absolute;
       top: 6px; right: 8px;
       z-index: 11;
-      width: 18px; height: 18px;
+      width: 22px; height: 22px;
       border-radius: 50%;
-      border: 1px solid var(--border);
+      border: 1.5px solid var(--accent);
       background: #1a2133;
-      color: var(--muted);
+      color: var(--accent);
       font-family: inherit;
-      font-size: 0.62rem;
+      font-size: 0.82rem;
       font-style: italic;
+      font-weight: 700;
       line-height: 1;
       cursor: pointer;
-      transition: color 0.15s, border-color 0.15s;
+      transition: color 0.15s, background 0.15s, border-color 0.15s;
     }
 
     #graph-info-btn:hover,
-    #graph-info-btn[aria-expanded="true"] {
-      color: var(--accent);
+    #graph-info-btn[aria-expanded="true"],
+    #map-info-btn:hover,
+    #map-info-btn[aria-expanded="true"] {
+      color: #0f1117;
+      background: var(--accent);
       border-color: var(--accent);
     }
 
-    #graph-info-popover {
+    #graph-info-popover,
+    #map-info-popover {
       position: absolute;
       top: 28px; right: 8px;
       z-index: 12;
@@ -315,15 +321,31 @@
       box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5);
     }
 
-    #graph-info-popover[hidden] { display: none; }
+    #graph-info-popover[hidden],
+    #map-info-popover[hidden] { display: none; }
 
-    #graph-info-popover .gi-title {
+    #graph-info-popover .gi-title,
+    #map-info-popover .gi-title {
       font-size: 0.62rem;
       letter-spacing: 0.1em;
       text-transform: uppercase;
       color: var(--text);
       margin-bottom: 0.55rem;
     }
+
+    /* Map info button sits under the "World Map" label, left-aligned. */
+    #map-info-btn { top: 26px; left: 10px; right: auto; }
+    #map-info-popover { top: 54px; left: 10px; right: auto; }
+
+    #map-info-popover p {
+      font-size: 0.66rem;
+      line-height: 1.5;
+      color: var(--muted);
+      margin: 0 0 0.55rem 0;
+    }
+
+    #map-info-popover p:last-child { margin-bottom: 0; }
+    #map-info-popover b { color: var(--text); font-weight: 400; }
 
     #graph-info-popover .gi-source { color: var(--muted); }
 
@@ -515,6 +537,12 @@
 <!-- MAP -->
 <div class="panel" id="map-panel">
   <div class="panel-label">World Map</div>
+  <button id="map-info-btn" type="button" aria-label="What do the connection lines mean?" aria-expanded="false">i</button>
+  <div id="map-info-popover" role="dialog" aria-label="Connection arcs explained" hidden>
+    <div class="gi-title">Connection arcs</div>
+    <p>Lines link the selected country to others it shares Panama-Papers ties with. A tie is an <b>officer</b>, <b>intermediary</b>, or <b>registered address</b> connecting a node here to a node there.</p>
+    <p>Thicker lines mean more ties. Arcs are <b>undirected</b>, they show entanglement between jurisdictions, not direction or money flow.</p>
+  </div>
 </div>
 
 <!-- INFO -->

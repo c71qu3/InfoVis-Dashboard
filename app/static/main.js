@@ -1,4 +1,4 @@
-import { fmt } from './js/utils.js';
+import { fmt, initInfoPopover } from './js/utils.js';
 import { initTooltip } from './js/tooltip.js';
 import { createIso2Resolver } from './js/countryCodes.js';
 import { buildNumericToIso3Map } from './js/isoNumeric.js';
@@ -12,6 +12,9 @@ import { initWorldMap } from './js/map.js';
 // NOTE: d3 and topojson are loaded from CDN in index.html and exposed as globals.
 
 const tooltip = initTooltip('tooltip');
+
+// Map "i" button → explanation of the connection arcs.
+initInfoPopover('map-info-btn', 'map-info-popover');
 
 // Build country-code lookup tables (single World Bank request)
 async function buildWorldBankMaps() {

@@ -1,4 +1,5 @@
 import { fetchEntityGraph, fetchEntityFocusedGraph, fetchIntermediaryFocusedGraph, fetchJurisdictions } from './api.js';
+import { initInfoPopover } from './utils.js';
 
 const TYPE_COLORS = {
   Entity: '#4f8ef7',
@@ -10,36 +11,11 @@ const TYPE_COLORS = {
 
 const LINE_PALETTE = ['#4f8ef7', '#f7a24f', '#5fd0a0', '#b07ff7', '#e0708f', '#5cc8e0', '#d8c45a', '#8c7bf0'];
 
-// Click-to-toggle "i" popover explaining the ICIJ node types. Closes on
-// outside click or Escape so it never sits on top of the graph.
-function initInfoPopover() {
-  const btn = document.getElementById('graph-info-btn');
-  const popover = document.getElementById('graph-info-popover');
-  if (!btn || !popover) return;
-
-  const setOpen = (open) => {
-    popover.hidden = !open;
-    btn.setAttribute('aria-expanded', String(open));
-  };
-
-  btn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    setOpen(popover.hidden);
-  });
-
-  document.addEventListener('click', (e) => {
-    if (!popover.hidden && !popover.contains(e.target)) setOpen(false);
-  });
-
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') setOpen(false);
-  });
-}
-
 export function createGraphPanel({ tooltip }) {
   const graphHint = document.getElementById('graph-hint');
 
-  initInfoPopover();
+  // "i" popover explaining the ICIJ node types.
+  initInfoPopover('graph-info-btn', 'graph-info-popover');
 
   let graphSvg = null;
   let graphG = null;

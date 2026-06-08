@@ -8,6 +8,7 @@
     ├── docker-compose.yml
     │
     ├── filter_data.ipynb
+    ├── filter_data.py
     ├── .python-version
     ├── pyproject.toml
     ├── uv.lock
@@ -61,11 +62,13 @@ uv venv
 uv sync
 ```
 
-4. Run `filter_data.ipynb` notebook or `filter_data.py` script to unpack ZIP file.
+4. Build and run the containers from the `InfoVis-Dashboard/` directory.
 
-**Note:** If you use _Docker_ instead of _Podman_ just replace the commands (`docker-compose` in place of `podman-compose`).
+   On first startup the `app` container will automatically run `filter_data.py` to unpack/filter the downloaded ZIP (only if the filtered CSVs are missing in `./data/`).
 
-5. Build all containers from the `InfoVis-Dashboard/` directory. For Linux users:
+   **Note:** If you use _Docker_ instead of _Podman_ just replace the commands (`docker-compose` in place of `podman-compose`).
+
+   For Linux users:
 
 ```{bash}
 podman-compose up --build

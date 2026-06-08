@@ -1,7 +1,8 @@
 import { fetchIntermediaries } from './api.js';
 
-export function createListPanel({ onSelectIntermediary, onSelectEntity } = {}) {
+export function createListPanel({ onSelectIntermediary, onSelectEntity, onSelectOfficer } = {}) {
   const statusEl = document.getElementById('entities-status');
+  const typeDescEl = document.getElementById('entities-type-desc');
   const summaryEl = document.getElementById('entities-summary');
   const listEl = document.getElementById('entities-list');
   const loadMoreBtn = document.getElementById('entities-load-more');
@@ -25,8 +26,21 @@ export function createListPanel({ onSelectIntermediary, onSelectEntity } = {}) {
     intermediary: 'intermediaries',
   };
 
+  // Short definitions shown under the type dropdown.
+  const TYPE_DESC = {
+    all: 'All node types (entities, officers, and intermediaries).',
+    entity: 'Entity: an offshore company, trust, or fund.',
+    officer: 'Officer: a person or company connected to an entity (e.g., director, shareholder, beneficiary).',
+    intermediary: 'Intermediary: an agent or firm that helps set up offshore entities.',
+  };
+
   function setStatus(text) {
     if (statusEl) statusEl.textContent = text;
+  }
+
+  function setTypeDescription() {
+    if (!typeDescEl) return;
+    typeDescEl.textContent = TYPE_DESC[currentType] || '';
   }
 
   function setSummary({ countryName = null, total = null, shown = null } = {}) {
@@ -64,7 +78,7 @@ export function createListPanel({ onSelectIntermediary, onSelectEntity } = {}) {
     currentCountryName = '';
     setSummary({ countryName: null });
     clearList();
-    setStatus('Select a country to view its intermediaries.');
+    setStatus('Select a country to view its nodes.');
   }
 
   function renderItems(items, { append = false } = {}) {
@@ -194,8 +208,12 @@ export function createListPanel({ onSelectIntermediary, onSelectEntity } = {}) {
   }
 
   if (typeEl) {
+    // Ensure our internal default matches the DOM default.
+    currentType = typeEl.value || currentType;
+
     typeEl.addEventListener('change', () => {
       currentType = typeEl.value || 'all';
+      setTypeDescription();
       reload();
     });
   }
@@ -233,11 +251,14 @@ export function createListPanel({ onSelectIntermediary, onSelectEntity } = {}) {
       } else if (nodeType === 'intermediary' || !nodeType) {
         if (typeof onSelectIntermediary === 'function') onSelectIntermediary(nodeId, nodeName, currentIso3);
         else if (typeof onSelectEntity === 'function') onSelectEntity(nodeId, nodeName, currentIso3);
+      } else if (nodeType === 'officer') {
+        if (typeof onSelectOfficer === 'function') onSelectOfficer(nodeId, nodeName, currentIso3);
+        else if (typeof onSelectEntity === 'function') onSelectEntity(nodeId, nodeName, currentIso3);
       }
-      // Officers have no dedicated focus graph; selection highlights only.
     });
   }
 
+  setTypeDescription();
   clear();
 
   return {

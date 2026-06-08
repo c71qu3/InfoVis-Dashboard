@@ -23,6 +23,7 @@ from src.graph_layer import (
     get_country_nodes,
     get_entity_graph,
     get_intermediary_graph,
+    get_officer_graph,
 )
 
 
@@ -80,12 +81,21 @@ def api_jurisdictions():
 
 @app.route("/api/entity_graph/<entity_id>")
 def api_entity_graph(entity_id):
+    # Backward-compatible params (previously used to *sample* the neighborhood)
     intermediaries = clamp_arg(request.args, "intermediaries", 6, 1, 25)
     per_i = clamp_arg(request.args, "per_i", 6, 1, 25)
     officers = clamp_arg(request.args, "officers", 2, 0, 10)
 
+    # New params: connected-subgraph limits
+    depth = clamp_arg(request.args, "depth", 4, 0, 4)
+    max_nodes = clamp_arg(request.args, "max_nodes", 5000, 1, 20000)
+    max_rels = clamp_arg(request.args, "max_rels", 20000, 0, 60000)
+
     result = get_entity_graph(
         entity_id=entity_id,
+        max_depth=depth,
+        max_nodes=max_nodes,
+        max_rels=max_rels,
         intermediaries=intermediaries,
         entities_per_intermediary=per_i,
         officers_per_entity=officers,
@@ -95,17 +105,46 @@ def api_entity_graph(entity_id):
 
 @app.route("/api/intermediary_graph/<intermediary_id>")
 def api_intermediary_graph(intermediary_id):
-    # Optional: filter entity expansion by country
+    # Backward-compatible params (previously used to *sample* the neighborhood)
     iso3 = (request.args.get("iso3") or "").strip().upper() or None
-
     entities = clamp_arg(request.args, "entities", 12, 1, 80)
     officers = clamp_arg(request.args, "officers", 2, 0, 10)
 
+    # New params: connected-subgraph limits
+    depth = clamp_arg(request.args, "depth", 4, 0, 4)
+    max_nodes = clamp_arg(request.args, "max_nodes", 5000, 1, 20000)
+    max_rels = clamp_arg(request.args, "max_rels", 20000, 0, 60000)
+
     result = get_intermediary_graph(
         intermediary_id=intermediary_id,
+        max_depth=depth,
+        max_nodes=max_nodes,
+        max_rels=max_rels,
         iso3=iso3,
         entities=entities,
         officers_per_entity=officers,
+    )
+    return jsonify(result)
+
+
+@app.route("/api/officer_graph/<officer_id>")
+def api_officer_graph(officer_id):
+    # Backward-compatible params (previously used to *sample* the neighborhood)
+    entities = clamp_arg(request.args, "entities", 12, 1, 80)
+    intermediaries = clamp_arg(request.args, "intermediaries", 6, 0, 25)
+
+    # New params: connected-subgraph limits
+    depth = clamp_arg(request.args, "depth", 4, 0, 4)
+    max_nodes = clamp_arg(request.args, "max_nodes", 5000, 1, 20000)
+    max_rels = clamp_arg(request.args, "max_rels", 20000, 0, 60000)
+
+    result = get_officer_graph(
+        officer_id=officer_id,
+        max_depth=depth,
+        max_nodes=max_nodes,
+        max_rels=max_rels,
+        entities=entities,
+        intermediaries_per_entity=intermediaries,
     )
     return jsonify(result)
 

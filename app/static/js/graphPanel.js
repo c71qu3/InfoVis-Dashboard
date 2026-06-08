@@ -1,4 +1,4 @@
-import { fetchEntityGraph, fetchEntityFocusedGraph, fetchIntermediaryFocusedGraph, fetchJurisdictions } from './api.js';
+import { fetchEntityGraph, fetchEntityFocusedGraph, fetchIntermediaryFocusedGraph, fetchOfficerFocusedGraph, fetchJurisdictions } from './api.js';
 import { initInfoPopover } from './utils.js';
 
 const TYPE_COLORS = {
@@ -178,7 +178,8 @@ export function createGraphPanel({ tooltip }) {
 
     let data;
     try {
-      data = await fetchIntermediaryFocusedGraph(id, { iso3 });
+      // Don't filter by country here; show the full connected subgraph.
+      data = await fetchIntermediaryFocusedGraph(id);
     } catch (e) {
       if (token !== graphReq) return;
       console.warn(e);
@@ -204,6 +205,47 @@ export function createGraphPanel({ tooltip }) {
     renderEntityGraph(data, id);
   }
 
+  async function loadOfficerFocusGraph(officerId, officerName = '') {
+    const token = ++graphReq;
+
+    const id = (officerId ?? '').toString().trim();
+    if (!id) {
+      graphHint.style.display = '';
+      graphHint.textContent = 'No officer selected.';
+      return;
+    }
+
+    graphHint.style.display = '';
+    graphHint.textContent = `Loading graph for ${officerName || 'officer'}…`;
+
+    let data;
+    try {
+      data = await fetchOfficerFocusedGraph(id);
+    } catch (e) {
+      if (token !== graphReq) return;
+      console.warn(e);
+      graphHint.textContent = 'Error loading officer graph.';
+      return;
+    }
+
+    if (token !== graphReq) return;
+
+    if (data?.error) {
+      clear();
+      graphHint.textContent = 'Graph database unavailable.';
+      return;
+    }
+
+    if (!data?.nodes || data.nodes.length === 0) {
+      clear();
+      graphHint.textContent = `No graph found for ${officerName || id}.`;
+      return;
+    }
+
+    graphHint.style.display = 'none';
+    renderEntityGraph(data, id);
+  }
+
   function renderEntityGraph(data, focusId = null) {
     if (graphSim) graphSim.stop();
     ensureGraphSvg();
@@ -216,11 +258,32 @@ export function createGraphPanel({ tooltip }) {
 
     graphG.selectAll('*').remove();
 
-    const nodes = data.nodes.map((n) => ({ ...n }));
+    // Filter out Address nodes (they tend to be high-fanout and overwhelm the view).
+    const nodes = (data.nodes || []).map((n) => ({ ...n })).filter((n) => n.type !== 'Address');
+    const nodeIdSet = new Set(nodes.map((n) => String(n.id)));
+
+    // Filter out links that touch Address (or any node we dropped).
+    const rawLinks = (data.links || []).filter((l) => nodeIdSet.has(String(l.source)) && nodeIdSet.has(String(l.target)));
+
+    // Recompute degrees after filtering so sizing/labels match what is actually displayed.
+    const deg = new Map();
+    for (const l of rawLinks) {
+      const s = String(l.source);
+      const t = String(l.target);
+      deg.set(s, (deg.get(s) || 0) + 1);
+      deg.set(t, (deg.get(t) || 0) + 1);
+    }
+    for (const n of nodes) n.degree = deg.get(String(n.id)) || 0;
+
+    if (!nodes.length) {
+      graphHint.style.display = '';
+      graphHint.textContent = 'No non-address nodes to display.';
+      return;
+    }
 
     // collapse repeat links between the same pair; weight = connection frequency
     const linkMap = new Map();
-    for (const l of data.links) {
+    for (const l of rawLinks) {
       const key = l.source < l.target ? `${l.source}|${l.target}` : `${l.target}|${l.source}`;
       const existing = linkMap.get(key);
       if (existing) existing.weight++;
@@ -400,6 +463,7 @@ export function createGraphPanel({ tooltip }) {
     loadEntityGraph,
     loadEntityFocusGraph,
     loadIntermediaryFocusGraph,
+    loadOfficerFocusGraph,
     loadJurisdictionFlows
   };
 }

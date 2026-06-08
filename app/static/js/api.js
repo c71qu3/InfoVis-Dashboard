@@ -77,8 +77,23 @@ export async function fetchIntermediaries(iso3, { limit = 200, offset = 0, q = n
   return await fetchJson(url);
 }
 
-export async function fetchEntityFocusedGraph(entityId, { intermediaries = 6, per_i = 6, officers = 2 } = {}) {
+export async function fetchEntityFocusedGraph(entityId, {
+  // Connected-subgraph controls (preferred)
+  depth = 4,
+  max_nodes = 5000,
+  max_rels = 20000,
+
+  // Backward-compatible params (no longer required; server accepts them)
+  intermediaries = null,
+  per_i = null,
+  officers = null,
+} = {}) {
   const params = new URLSearchParams();
+
+  if (depth != null) params.set('depth', String(depth));
+  if (max_nodes != null) params.set('max_nodes', String(max_nodes));
+  if (max_rels != null) params.set('max_rels', String(max_rels));
+
   if (intermediaries != null) params.set('intermediaries', String(intermediaries));
   if (per_i != null) params.set('per_i', String(per_i));
   if (officers != null) params.set('officers', String(officers));
@@ -91,8 +106,24 @@ export async function fetchEntityFocusedGraph(entityId, { intermediaries = 6, pe
   return await fetchJson(url);
 }
 
-export async function fetchIntermediaryFocusedGraph(intermediaryId, { iso3 = null, entities = 12, officers = 2 } = {}) {
+export async function fetchIntermediaryFocusedGraph(intermediaryId, {
+  // Connected-subgraph controls (preferred)
+  depth = 4,
+  max_nodes = 5000,
+  max_rels = 20000,
+
+  // Backward-compatible params (iso3 is intentionally ignored server-side now)
+  iso3 = null,
+  entities = null,
+  officers = null,
+} = {}) {
   const params = new URLSearchParams();
+
+  if (depth != null) params.set('depth', String(depth));
+  if (max_nodes != null) params.set('max_nodes', String(max_nodes));
+  if (max_rels != null) params.set('max_rels', String(max_rels));
+
+  // Keep these for backward compatibility with older servers/clients.
   if (iso3) params.set('iso3', String(iso3));
   if (entities != null) params.set('entities', String(entities));
   if (officers != null) params.set('officers', String(officers));
@@ -101,6 +132,33 @@ export async function fetchIntermediaryFocusedGraph(intermediaryId, { iso3 = nul
   const url = qs
     ? `/api/intermediary_graph/${encodeURIComponent(intermediaryId)}?${qs}`
     : `/api/intermediary_graph/${encodeURIComponent(intermediaryId)}`;
+
+  return await fetchJson(url);
+}
+
+export async function fetchOfficerFocusedGraph(officerId, {
+  // Connected-subgraph controls (preferred)
+  depth = 4,
+  max_nodes = 5000,
+  max_rels = 20000,
+
+  // Backward-compatible params
+  entities = null,
+  intermediaries = null,
+} = {}) {
+  const params = new URLSearchParams();
+
+  if (depth != null) params.set('depth', String(depth));
+  if (max_nodes != null) params.set('max_nodes', String(max_nodes));
+  if (max_rels != null) params.set('max_rels', String(max_rels));
+
+  if (entities != null) params.set('entities', String(entities));
+  if (intermediaries != null) params.set('intermediaries', String(intermediaries));
+
+  const qs = params.toString();
+  const url = qs
+    ? `/api/officer_graph/${encodeURIComponent(officerId)}?${qs}`
+    : `/api/officer_graph/${encodeURIComponent(officerId)}`;
 
   return await fetchJson(url);
 }

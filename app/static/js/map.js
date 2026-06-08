@@ -281,7 +281,7 @@ export async function initWorldMap({
       .attr('d', (d) => arcPath(d.src, d.dst))
       .on('mouseover', (e, d) => {
         const w = Number(d.weight) || 0;
-        tooltip.show(e, `${d.focusLabel} ↔ ${d.otherLabel} · ${w.toLocaleString()} shared link${w === 1 ? '' : 's'}`);
+        tooltip.show(e, `${d.focusLabel} ↔ ${d.otherLabel} · ${w.toLocaleString()} shared node${w === 1 ? '' : 's'}`);
       })
       .on('mousemove', tooltip.move)
       .on('mouseout', tooltip.hide)

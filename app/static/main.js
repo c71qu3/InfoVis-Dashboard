@@ -69,7 +69,8 @@ const infoPanel = createInfoPanel({ fmt });
 const graphPanel = createGraphPanel({ tooltip });
 const listPanel = createListPanel({
   onSelectIntermediary: (intermediaryId, intermediaryName, iso3) => graphPanel.loadIntermediaryFocusGraph(intermediaryId, intermediaryName, iso3),
-  onSelectEntity: (entityId, entityName) => graphPanel.loadEntityFocusGraph(entityId, entityName)
+  onSelectEntity: (entityId, entityName) => graphPanel.loadEntityFocusGraph(entityId, entityName),
+  onSelectOfficer: (officerId, officerName) => graphPanel.loadOfficerFocusGraph(officerId, officerName)
 });
 
 infoPanel.clear();

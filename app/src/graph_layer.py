@@ -152,6 +152,44 @@ RETURN DISTINCT elementId(r) AS eid, type(r) AS rel,
        endNode(r).node_id AS t_id, labels(endNode(r)) AS t_labels, endNode(r).name AS t_name
 """
 
+# Officer-focused graph view (when clicking an officer in the list)
+OFFICER_EXISTS_QUERY = """
+MATCH (o:Officer)
+WHERE toString(o.node_id) = toString($officer_id)
+RETURN o.node_id AS id, o.name AS name
+LIMIT 1
+"""
+
+OFFICER_FOCUS_GRAPH_QUERY = """
+MATCH (o:Officer)
+WHERE toString(o.node_id) = toString($officer_id)
+CALL {
+    WITH o
+    MATCH (o)-[:officer_of]-(e:Entity)
+    RETURN e
+    ORDER BY toLower(coalesce(e.name,'')) ASC
+    LIMIT $entities
+}
+CALL {
+    WITH e
+    OPTIONAL MATCH (e)-[:intermediary_of]-(i:Intermediary)
+    RETURN i
+    ORDER BY toLower(coalesce(i.name,'')) ASC
+    LIMIT $intermediaries_per_entity
+}
+WITH collect(DISTINCT o) + collect(DISTINCT e) + collect(DISTINCT i) AS ns
+UNWIND ns AS n
+WITH n WHERE n IS NOT NULL
+WITH collect(DISTINCT n) AS nodes
+UNWIND nodes AS x
+MATCH (x)-[r]-(y:Node)
+WHERE y IN nodes
+RETURN DISTINCT elementId(r) AS eid, type(r) AS rel,
+       startNode(r).node_id AS r_start, endNode(r).node_id AS r_end,
+       startNode(r).node_id AS s_id, labels(startNode(r)) AS s_labels, startNode(r).name AS s_name,
+       endNode(r).node_id AS t_id, labels(endNode(r)) AS t_labels, endNode(r).name AS t_name
+"""
+
 
 # Lazy, module-level driver
 _driver = None
@@ -177,6 +215,47 @@ def node_type(labels):
         if lbl in NODE_TYPES:
             return lbl
     return "Node"
+
+
+# Focus-graph defaults (used for entity/officer/intermediary click-through graphs).
+# These queries can get large; keep safety limits to avoid locking up Neo4j / the browser.
+DEFAULT_FOCUS_MAX_DEPTH = 4
+DEFAULT_FOCUS_MAX_NODES = 5000
+DEFAULT_FOCUS_MAX_RELS = 20000
+
+
+def _focus_component_query(start_label: str, max_depth: int) -> str:
+    """Cypher query for a connected subgraph around a focused node.
+
+    Notes:
+      - Excludes `:Address` nodes to prevent high-fanout blowups in the UI.
+      - `max_depth` is embedded (not parameterized) because Neo4j doesn't allow
+        parameterizing variable-length path bounds.
+    """
+
+    # Hard cap depth to keep UI graphs readable.
+    d = min(DEFAULT_FOCUS_MAX_DEPTH, max(0, int(max_depth)))
+
+    return f"""
+MATCH (s:{start_label})
+WHERE toString(s.node_id) = toString($node_id)
+CALL {{
+    WITH s
+    MATCH (s)-[*0..{d}]-(n:Node)
+    WHERE NOT n:Address
+    RETURN DISTINCT n
+    LIMIT $max_nodes
+}}
+WITH collect(DISTINCT n) AS nodes
+UNWIND nodes AS x
+MATCH (x)-[r]-(y:Node)
+WHERE y IN nodes
+RETURN DISTINCT elementId(r) AS eid, type(r) AS rel,
+       startNode(r).node_id AS r_start, endNode(r).node_id AS r_end,
+       startNode(r).node_id AS s_id, labels(startNode(r)) AS s_labels, startNode(r).name AS s_name,
+       endNode(r).node_id AS t_id, labels(endNode(r)) AS t_labels, endNode(r).name AS t_name
+LIMIT $max_rels
+"""
 
 
 # Agent-centred: anchor on intermediaries; return all edges among the selected node set.
@@ -262,6 +341,39 @@ JURIS_QUERY = """
 MATCH (a:Node)-[r]->(b:Node)
 WHERE a.country_codes IS NOT NULL AND b.country_codes IS NOT NULL
 RETURN a.country_codes AS ca, b.country_codes AS cb, count(*) AS w
+"""
+
+# When a specific focus jurisdiction is selected on the map we want arc weights to be
+# comparable to the right-side list panel.
+#
+# The list panel's "all" mode defines the country's node set as:
+#   - Entities whose `country_codes` contains the ISO3
+#   - Intermediaries connected to those entities
+#   - Officers connected to those entities
+#
+# For each other jurisdiction, we count how many DISTINCT nodes from that focus set have
+# at least one relationship to any node whose *primary* country code is the other ISO3.
+# This yields "shared nodes" (not raw relationship/edge counts), so weights don't balloon.
+JURIS_FOCUS_NODECOUNT_QUERY = """
+CALL {
+  MATCH (n:Entity) WHERE n.country_codes CONTAINS $iso3 RETURN n
+  UNION
+  MATCH (n:Intermediary)-[:intermediary_of]-(e:Entity) WHERE e.country_codes CONTAINS $iso3 RETURN n
+  UNION
+  MATCH (n:Officer)-[:officer_of]-(e:Entity) WHERE e.country_codes CONTAINS $iso3 RETURN n
+}
+WITH DISTINCT n
+MATCH (n)-[r]-(m:Node)
+WITH n,
+     head([
+       p IN split(replace(replace(coalesce(m.country_codes,''), ',', ';'), ' ', ''), ';')
+       WHERE toUpper(p) =~ '^[A-Z]{3}$'
+       | toUpper(p)
+     ]) AS other
+WHERE other IS NOT NULL AND other <> $iso3
+RETURN other AS other, count(DISTINCT n) AS w
+ORDER BY w DESC
+LIMIT $limit
 """
 
 _juris_cache = None  # (pairs, totals)
@@ -402,10 +514,20 @@ def get_country_nodes(iso3: str, q: str | None = None, node_type: str = "all", l
         return {"items": [], "total": 0, "limit": limit, "offset": offset, "error": "graph_unavailable"}
 
 
-def get_entity_graph(entity_id: str, intermediaries: int = 6, entities_per_intermediary: int = 6, officers_per_entity: int = 2):
-    """Return a small graph centered on a single Entity (node_id).
+def get_entity_graph(
+    entity_id: str,
+    max_depth: int = DEFAULT_FOCUS_MAX_DEPTH,
+    max_nodes: int = DEFAULT_FOCUS_MAX_NODES,
+    max_rels: int = DEFAULT_FOCUS_MAX_RELS,
+    **_,
+):
+    """Return the connected subgraph around a single Entity (node_id).
 
-    Returns the same shape as get_country_graph: {nodes: [...], links: [...]}.
+    Compared to the earlier "focused" query, this returns the connected
+    subgraph around the entity (but excludes `:Address` nodes), up to the
+    configured safety limits.
+
+    Returns: {nodes: [...], links: [...]}.
     """
 
     driver = _get_driver()
@@ -415,6 +537,9 @@ def get_entity_graph(entity_id: str, intermediaries: int = 6, entities_per_inter
     entity_id = (entity_id or "").strip()
     if not entity_id:
         return {"nodes": [], "links": []}
+
+    max_nodes = int(max_nodes)
+    max_rels = int(max_rels)
 
     # Ensure the entity exists (and get a label) even if it has no relationships.
     try:
@@ -430,20 +555,13 @@ def get_entity_graph(entity_id: str, intermediaries: int = 6, entities_per_inter
                 "degree": 0,
             }
 
-            nodes, links, seen = {}, [], set()
-            rows = list(
-                session.run(
-                    ENTITY_FOCUS_GRAPH_QUERY,
-                    entity_id=entity_id,
-                    intermediaries=int(intermediaries),
-                    entities_per_intermediary=int(entities_per_intermediary),
-                    officers_per_entity=int(officers_per_entity),
-                )
-            )
+            query = _focus_component_query("Entity", max_depth=max_depth)
+            rows = list(session.run(query, node_id=entity_id, max_nodes=max_nodes, max_rels=max_rels))
 
             if not rows:
                 return {"nodes": [base_node], "links": []}
 
+            nodes, links, seen = {}, [], set()
             for rec in rows:
                 for nid, labels, name in (
                     (rec["s_id"], rec["s_labels"], rec["s_name"]),
@@ -477,12 +595,21 @@ def get_entity_graph(entity_id: str, intermediaries: int = 6, entities_per_inter
     return {"nodes": list(nodes.values()), "links": links}
 
 
-def get_intermediary_graph(intermediary_id: str, iso3: str | None = None, entities: int = 12, officers_per_entity: int = 2):
-    """Return a small graph centered on a single Intermediary (node_id).
+def get_intermediary_graph(
+    intermediary_id: str,
+    iso3: str | None = None,
+    max_depth: int = DEFAULT_FOCUS_MAX_DEPTH,
+    max_nodes: int = DEFAULT_FOCUS_MAX_NODES,
+    max_rels: int = DEFAULT_FOCUS_MAX_RELS,
+    **_,
+):
+    """Return the connected subgraph around a single Intermediary (node_id).
 
-    If iso3 is provided (AAA), the Entity expansion is filtered to that country's entities.
+    Includes node types connected to the intermediary (but excludes `:Address`
+    nodes), up to the configured safety limits.
 
-    Returns the same shape as get_country_graph: {nodes: [...], links: [...]}.
+    NOTE: `iso3` is accepted for backward compatibility but is intentionally not
+    used here, so the focused graph is not artificially truncated to one country.
     """
 
     driver = _get_driver()
@@ -493,8 +620,8 @@ def get_intermediary_graph(intermediary_id: str, iso3: str | None = None, entiti
     if not intermediary_id:
         return {"nodes": [], "links": []}
 
-    iso3 = (iso3 or "").strip().upper()
-    iso3 = iso3 if re.match(r"^[A-Z]{3}$", iso3) else None
+    max_nodes = int(max_nodes)
+    max_rels = int(max_rels)
 
     # Ensure the intermediary exists (and get a label) even if it has no relationships.
     try:
@@ -510,20 +637,13 @@ def get_intermediary_graph(intermediary_id: str, iso3: str | None = None, entiti
                 "degree": 0,
             }
 
-            nodes, links, seen = {}, [], set()
-            rows = list(
-                session.run(
-                    INTERMEDIARY_FOCUS_GRAPH_QUERY,
-                    intermediary_id=intermediary_id,
-                    iso3=iso3,
-                    entities=int(entities),
-                    officers_per_entity=int(officers_per_entity),
-                )
-            )
+            query = _focus_component_query("Intermediary", max_depth=max_depth)
+            rows = list(session.run(query, node_id=intermediary_id, max_nodes=max_nodes, max_rels=max_rels))
 
             if not rows:
                 return {"nodes": [base_node], "links": []}
 
+            nodes, links, seen = {}, [], set()
             for rec in rows:
                 for nid, labels, name in (
                     (rec["s_id"], rec["s_labels"], rec["s_name"]),
@@ -554,14 +674,102 @@ def get_intermediary_graph(intermediary_id: str, iso3: str | None = None, entiti
     if base_node["id"] not in nodes:
         nodes[base_node["id"]] = base_node
 
+        return {"nodes": list(nodes.values()), "links": links}
+
+
+def get_officer_graph(
+    officer_id: str,
+    max_depth: int = DEFAULT_FOCUS_MAX_DEPTH,
+    max_nodes: int = DEFAULT_FOCUS_MAX_NODES,
+    max_rels: int = DEFAULT_FOCUS_MAX_RELS,
+    **_,
+):
+    """Return the connected subgraph around a single Officer (node_id).
+
+    Includes node types connected to the officer (but excludes `:Address`
+    nodes), up to the configured safety limits.
+
+    Returns: {nodes: [...], links: [...]}.
+    """
+
+    driver = _get_driver()
+    if driver is None:
+        return {"nodes": [], "links": []}
+
+    officer_id = (officer_id or "").strip()
+    if not officer_id:
+        return {"nodes": [], "links": []}
+
+    max_nodes = int(max_nodes)
+    max_rels = int(max_rels)
+
+    # Ensure the officer exists (and get a label) even if it has no relationships.
+    try:
+        with driver.session() as session:
+            base = session.run(OFFICER_EXISTS_QUERY, officer_id=officer_id).single()
+            if not base:
+                return {"nodes": [], "links": []}
+
+            base_node = {
+                "id": base["id"],
+                "label": base["name"] or str(base["id"]),
+                "type": "Officer",
+                "degree": 0,
+            }
+
+            query = _focus_component_query("Officer", max_depth=max_depth)
+            rows = list(session.run(query, node_id=officer_id, max_nodes=max_nodes, max_rels=max_rels))
+
+            if not rows:
+                return {"nodes": [base_node], "links": []}
+
+            nodes, links, seen = {}, [], set()
+            for rec in rows:
+                for nid, labels, name in (
+                    (rec["s_id"], rec["s_labels"], rec["s_name"]),
+                    (rec["t_id"], rec["t_labels"], rec["t_name"]),
+                ):
+                    if nid not in nodes:
+                        nodes[nid] = {
+                            "id": nid,
+                            "label": name or str(nid),
+                            "type": node_type(labels),
+                            "degree": 0,
+                        }
+
+                if rec["eid"] not in seen:
+                    seen.add(rec["eid"])
+                    links.append({"source": rec["r_start"], "target": rec["r_end"], "rel": rec["rel"]})
+
+    except Exception as e:
+        print(f"Officer-focused graph query failed for {officer_id}: {e}")
+        return {"nodes": [], "links": [], "error": "graph_unavailable"}
+
+    for l in links:
+        for end in ("source", "target"):
+            if l[end] in nodes:
+                nodes[l[end]]["degree"] += 1
+
+    # Ensure the focused officer is present in nodes.
+    if base_node["id"] not in nodes:
+        nodes[base_node["id"]] = base_node
+
     return {"nodes": list(nodes.values()), "links": links}
 
 
 
+
 def get_jurisdictions(focus=None, limit: int = 40):
-    """
+    """Jurisdiction arcs for the map.
+
     Returns:
       { nodes: [{id,label,degree,focus}], links: [{source,target,weight}], focus }
+
+    Notes:
+      - With a `focus` ISO3, `weight` counts DISTINCT focus-country nodes (same
+        definition as the list panel's country node list), so the magnitudes are
+        comparable to what users see in the list.
+      - Without `focus`, we fall back to the cached global edge-count view.
     """
     global _juris_cache
 
@@ -572,6 +780,59 @@ def get_jurisdictions(focus=None, limit: int = 40):
     focus = (focus or "").strip().upper()
     focus = focus if re.match(r"^[A-Z]{3}$", focus) else None
 
+    # Focused view: return a star graph from focus → other jurisdictions, where
+    # weight = count(DISTINCT focus nodes connected to that other jurisdiction).
+    if focus:
+        try:
+            with driver.session() as session:
+                rows = list(
+                    session.run(
+                        JURIS_FOCUS_NODECOUNT_QUERY,
+                        iso3=focus,
+                        limit=max(5, int(limit)),
+                    )
+                )
+        except Exception as e:
+            print(f"Jurisdiction focus query failed for {focus}: {e}")
+            return {"nodes": [], "links": [], "error": "graph_unavailable"}
+
+        weight_by_other = {}
+        for rec in rows:
+            other = (rec.get("other") or "").strip().upper()
+            if not other or other == focus:
+                continue
+            w = rec.get("w")
+            try:
+                w = int(w)
+            except Exception:
+                w = 0
+            if w <= 0:
+                continue
+            weight_by_other[other] = w
+
+        links = [
+            {"source": focus, "target": other, "weight": w}
+            for other, w in weight_by_other.items()
+        ]
+
+        used = set(weight_by_other.keys())
+        used.add(focus)
+
+        focus_degree = sum(weight_by_other.values())
+        nodes = []
+        for c in used:
+            nodes.append(
+                {
+                    "id": c,
+                    "label": iso3_to_name.get(c, c),
+                    "degree": focus_degree if c == focus else weight_by_other.get(c, 0),
+                    "focus": c == focus,
+                }
+            )
+
+        return {"nodes": nodes, "links": links, "focus": focus}
+
+    # Unfocused view: cached global pair weights (edge counts).
     try:
         if _juris_cache is None:
             _juris_cache = compute_jurisdiction_flows(driver)
@@ -581,13 +842,7 @@ def get_jurisdictions(focus=None, limit: int = 40):
 
     pairs, totals = _juris_cache
 
-    if focus:
-        chosen = sorted(
-            ((k, w) for k, w in pairs.items() if focus in k),
-            key=lambda kv: -kv[1],
-        )[: max(5, int(limit))]
-    else:
-        chosen = sorted(pairs.items(), key=lambda kv: -kv[1])[: max(5, int(limit))]
+    chosen = sorted(pairs.items(), key=lambda kv: -kv[1])[: max(5, int(limit))]
 
     used = set()
     links = []
@@ -600,8 +855,8 @@ def get_jurisdictions(focus=None, limit: int = 40):
             "id": c,
             "label": iso3_to_name.get(c, c),
             "degree": totals.get(c, 0),
-            "focus": c == focus,
+            "focus": False,
         }
         for c in used
     ]
-    return {"nodes": nodes, "links": links, "focus": focus}
+    return {"nodes": nodes, "links": links, "focus": None}

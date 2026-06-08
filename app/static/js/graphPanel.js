@@ -304,18 +304,37 @@ export function createGraphPanel({ tooltip }) {
       .attr('stroke-opacity', (d) => oScale(d.weight));
 
     const focus = focusId != null ? String(focusId) : null;
+    const FOCUS_BORDER = '#f75a4f';
 
     const node = graphG.append('g').selectAll('circle')
       .data(nodes).join('circle')
       .attr('class', 'gnode')
       .attr('r', (d) => rScale(d.degree))
       .attr('fill', (d) => TYPE_COLORS[d.type] || TYPE_COLORS.Node)
-      .attr('stroke', (d) => (focus && String(d.id) === focus ? '#fff' : '#0f1117'))
-      .attr('stroke-width', (d) => (focus && String(d.id) === focus ? 2.2 : 1))
+      // Highlight the node selected from the list panel with a colored border.
+      .attr('stroke', (d) => (focus && String(d.id) === focus ? FOCUS_BORDER : '#0f1117'))
+      .attr('stroke-width', (d) => (focus && String(d.id) === focus ? 3 : 1))
       .call(nodeDrag())
       .on('mouseover', (e, d) => tooltip.show(e, `${d.label} · ${d.type}${d.degree ? ` · ${d.degree} links` : ''}`))
       .on('mousemove', tooltip.move)
       .on('mouseout', tooltip.hide);
+
+    // Optional outer ring around the focused node to make it easier to spot.
+    const focusRing = focus
+      ? graphG.append('g').selectAll('circle')
+        .data(nodes.filter((d) => String(d.id) === focus))
+        .join('circle')
+        .attr('class', 'gfocus-ring')
+        .attr('r', (d) => rScale(d.degree) + 6)
+        .attr('fill', 'none')
+        .attr('stroke', FOCUS_BORDER)
+        .attr('stroke-width', 2.5)
+        .attr('stroke-opacity', 0.9)
+        .attr('pointer-events', 'none')
+      : null;
+
+    if (focus) node.filter((d) => String(d.id) === focus).raise();
+    if (focusRing) focusRing.raise();
 
     // only label the top hubs by degree so the view stays readable
     const hubIds = new Set([...nodes].sort((a, b) => b.degree - a.degree).slice(0, 8).map((d) => d.id));
@@ -339,6 +358,7 @@ export function createGraphPanel({ tooltip }) {
           .attr('x2', (d) => d.target.x)
           .attr('y2', (d) => d.target.y);
         node.attr('cx', (d) => d.x).attr('cy', (d) => d.y);
+        if (focusRing) focusRing.attr('cx', (d) => d.x).attr('cy', (d) => d.y);
         label.attr('x', (d) => d.x + rScale(d.degree) + 2).attr('y', (d) => d.y + 3);
       })
       .on('end', () => fitView(nodes, rScale));

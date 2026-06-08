@@ -258,12 +258,60 @@ export function createGraphPanel({ tooltip }) {
 
     graphG.selectAll('*').remove();
 
+    const focus = focusId != null ? String(focusId) : null;
+    const MAX_HOPS = 3;
+
     // Filter out Address nodes (they tend to be high-fanout and overwhelm the view).
-    const nodes = (data.nodes || []).map((n) => ({ ...n })).filter((n) => n.type !== 'Address');
-    const nodeIdSet = new Set(nodes.map((n) => String(n.id)));
+    // Normalize ids to strings so D3's forceLink can reliably match link endpoints.
+    let nodes = (data.nodes || [])
+      .map((n) => ({ ...n, id: n?.id != null ? String(n.id) : '' }))
+      .filter((n) => n.type !== 'Address');
+    let nodeIdSet = new Set(nodes.map((n) => n.id));
 
     // Filter out links that touch Address (or any node we dropped).
-    const rawLinks = (data.links || []).filter((l) => nodeIdSet.has(String(l.source)) && nodeIdSet.has(String(l.target)));
+    let rawLinks = (data.links || []).filter((l) => nodeIdSet.has(String(l.source)) && nodeIdSet.has(String(l.target)));
+
+    // If a node was selected from the list panel, only display the subgraph within MAX_HOPS steps.
+    // (Undirected BFS over the currently displayed links.)
+    if (focus) {
+      if (!nodeIdSet.has(focus)) {
+        graphHint.style.display = '';
+        graphHint.textContent = 'Selected node is not present in this graph.';
+        return;
+      }
+
+      const adj = new Map();
+      for (const l of rawLinks) {
+        const s = String(l.source);
+        const t = String(l.target);
+        if (!adj.has(s)) adj.set(s, new Set());
+        if (!adj.has(t)) adj.set(t, new Set());
+        adj.get(s).add(t);
+        adj.get(t).add(s);
+      }
+
+      const keep = new Set([focus]);
+      let frontier = [focus];
+      for (let depth = 0; depth < MAX_HOPS; depth++) {
+        const next = [];
+        for (const u of frontier) {
+          const ns = adj.get(u);
+          if (!ns) continue;
+          for (const v of ns) {
+            if (!keep.has(v)) {
+              keep.add(v);
+              next.push(v);
+            }
+          }
+        }
+        if (next.length === 0) break;
+        frontier = next;
+      }
+
+      nodes = nodes.filter((n) => keep.has(n.id));
+      nodeIdSet = new Set(nodes.map((n) => n.id));
+      rawLinks = rawLinks.filter((l) => nodeIdSet.has(String(l.source)) && nodeIdSet.has(String(l.target)));
+    }
 
     // Recompute degrees after filtering so sizing/labels match what is actually displayed.
     const deg = new Map();
@@ -281,13 +329,21 @@ export function createGraphPanel({ tooltip }) {
       return;
     }
 
+    if (focus && nodes.length === 1) {
+      graphHint.style.display = '';
+      graphHint.textContent = `No connections within ${MAX_HOPS} degrees for the selected node.`;
+      return;
+    }
+
     // collapse repeat links between the same pair; weight = connection frequency
     const linkMap = new Map();
     for (const l of rawLinks) {
-      const key = l.source < l.target ? `${l.source}|${l.target}` : `${l.target}|${l.source}`;
+      const s = String(l.source);
+      const t = String(l.target);
+      const key = s < t ? `${s}|${t}` : `${t}|${s}`;
       const existing = linkMap.get(key);
       if (existing) existing.weight++;
-      else linkMap.set(key, { source: l.source, target: l.target, rel: l.rel, weight: 1 });
+      else linkMap.set(key, { source: s, target: t, rel: l.rel, weight: 1 });
     }
     const links = [...linkMap.values()];
 
@@ -303,7 +359,6 @@ export function createGraphPanel({ tooltip }) {
       .attr('stroke-width', (d) => wScale(d.weight))
       .attr('stroke-opacity', (d) => oScale(d.weight));
 
-    const focus = focusId != null ? String(focusId) : null;
     const FOCUS_BORDER = '#f75a4f';
 
     const node = graphG.append('g').selectAll('circle')
@@ -337,8 +392,8 @@ export function createGraphPanel({ tooltip }) {
     if (focusRing) focusRing.raise();
 
     // only label the top hubs by degree so the view stays readable
-    const hubIds = new Set([...nodes].sort((a, b) => b.degree - a.degree).slice(0, 8).map((d) => d.id));
-    const hubs = nodes.filter((d) => hubIds.has(d.id) && d.degree > 1);
+    const hubIds = new Set([...nodes].sort((a, b) => b.degree - a.degree).slice(0, 8).map((d) => String(d.id)));
+    const hubs = nodes.filter((d) => hubIds.has(String(d.id)) && d.degree > 1);
     const label = graphG.append('g').selectAll('text')
       .data(hubs).join('text')
       .attr('class', 'glabel')

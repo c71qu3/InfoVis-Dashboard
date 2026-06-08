@@ -674,7 +674,7 @@ def get_intermediary_graph(
     if base_node["id"] not in nodes:
         nodes[base_node["id"]] = base_node
 
-        return {"nodes": list(nodes.values()), "links": links}
+    return {"nodes": list(nodes.values()), "links": links}
 
 
 def get_officer_graph(

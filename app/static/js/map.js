@@ -175,10 +175,84 @@ export async function initWorldMap({
   let lastJurisData = null;
   let lastJurisFocus = null;
 
+  // Side list: countries connected to the selected country via the rendered arcs.
+  const ARC_LIST_CLASS = 'map-arc-country-list';
+
+  function ensureArcListEl() {
+    let el = mapEl.querySelector(`.${ARC_LIST_CLASS}`);
+    if (el) return el;
+
+    // Ensure the list positions relative to the map panel.
+    const cs = window.getComputedStyle(mapEl);
+    if (cs.position === 'static') mapEl.style.position = 'relative';
+
+    el = document.createElement('div');
+    el.className = ARC_LIST_CLASS;
+
+    // Minimal inline styling so it works even without dedicated CSS.
+    el.style.position = 'absolute';
+    el.style.left = '20px';
+    el.style.bottom = '20px';
+    el.style.maxWidth = '260px';
+    el.style.maxHeight = '40%';
+    el.style.overflow = 'auto';
+    el.style.padding = '8px 10px';
+    el.style.border = '1px solid var(--border)';
+    el.style.background = 'var(--panel, rgba(15, 20, 30, 0.85))';
+    el.style.color = 'var(--text)';
+    el.style.borderRadius = '6px';
+    el.style.fontSize = '12px';
+    el.style.pointerEvents = 'auto';
+
+    mapEl.appendChild(el);
+    return el;
+  }
+
+  function clearConnectedCountriesList() {
+    const el = mapEl.querySelector(`.${ARC_LIST_CLASS}`);
+    if (!el) return;
+    el.innerHTML = '';
+    el.style.display = 'none';
+  }
+
+  function renderConnectedCountriesList({ focus, focusLabel, connections }) {
+    const el = ensureArcListEl();
+    el.style.display = 'block';
+    el.innerHTML = '';
+
+    const title = document.createElement('div');
+    title.textContent = `Connected to ${focusLabel || focus}`;
+    title.style.fontWeight = '600';
+    title.style.marginBottom = '6px';
+
+    const sub = document.createElement('div');
+    sub.textContent = 'Ordered by shared nodes (weight)';
+    sub.style.opacity = '0.85';
+    sub.style.fontSize = '11px';
+    sub.style.marginBottom = '6px';
+
+    const ol = document.createElement('ol');
+    ol.style.margin = '0';
+    ol.style.paddingLeft = '18px';
+
+    for (const c of connections) {
+      const li = document.createElement('li');
+      const w = Number(c.weight) || 0;
+      li.textContent = `${c.otherLabel || c.other} · ${w.toLocaleString()}`;
+      li.style.margin = '2px 0';
+      ol.appendChild(li);
+    }
+
+    el.appendChild(title);
+    el.appendChild(sub);
+    el.appendChild(ol);
+  }
+
   function clearJurisdictionArcs() {
     arcsG.selectAll('*').remove();
     lastJurisData = null;
     lastJurisFocus = null;
+    clearConnectedCountriesList();
   }
 
   function arcPath([x1, y1], [x2, y2]) {
@@ -208,6 +282,7 @@ export async function initWorldMap({
     if (!focus) {
       lastJurisData = null;
       lastJurisFocus = null;
+      clearConnectedCountriesList();
       return;
     }
 
@@ -215,7 +290,10 @@ export async function initWorldMap({
     lastJurisFocus = focus;
 
     const src = iso3ToXY.get(focus);
-    if (!src) return;
+    if (!src) {
+      clearConnectedCountriesList();
+      return;
+    }
 
     const labelByIso3 = new Map();
     for (const n of (jurisData?.nodes || [])) {
@@ -241,7 +319,31 @@ export async function initWorldMap({
       });
     }
 
-    if (drawable.length === 0) return;
+    if (drawable.length === 0) {
+      clearConnectedCountriesList();
+      return;
+    }
+
+    // Render the side list (aggregate by country, sort by weight desc).
+    const agg = new Map();
+    for (const d of drawable) {
+      const k = d.other;
+      const prev = agg.get(k);
+      agg.set(k, {
+        other: d.other,
+        otherLabel: d.otherLabel,
+        weight: (prev?.weight || 0) + (Number(d.weight) || 0)
+      });
+    }
+
+    const connections = [...agg.values()]
+      .sort((a, b) => (b.weight - a.weight) || String(a.otherLabel).localeCompare(String(b.otherLabel)));
+
+    renderConnectedCountriesList({
+      focus,
+      focusLabel: drawable[0]?.focusLabel || focus,
+      connections
+    });
 
     const maxW = d3.max(drawable, (d) => d.weight) || 1;
 

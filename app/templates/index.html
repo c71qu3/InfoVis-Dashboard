@@ -392,6 +392,97 @@
       vertical-align: middle;
     }
 
+    /* Node Details panel (inside Knowledge Graph) */
+    #node-details {
+      position: absolute;
+      right: 8px;
+      bottom: 8px;
+      z-index: 10;
+      width: 290px;
+      max-height: 58%;
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      padding: 0.55rem 0.65rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: rgba(26, 33, 51, 0.96);
+      overflow: hidden;
+    }
+
+    #node-details[hidden] { display: none; }
+
+    #node-details .nd-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+
+    #node-details .nd-title {
+      font-size: 0.62rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    #node-details-close {
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 0.9rem;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    #node-details-close:hover {
+      color: var(--accent2);
+      border-color: var(--accent2);
+      background: rgba(247, 162, 79, 0.08);
+    }
+
+    #node-details-body {
+      overflow: auto;
+      padding-right: 4px;
+      font-size: 0.68rem;
+      line-height: 1.45;
+      color: var(--text);
+    }
+
+    #node-details-body .nd-empty,
+    #node-details-body .nd-status {
+      color: var(--muted);
+      letter-spacing: 0.03em;
+      padding: 0.15rem 0;
+    }
+
+    .nd-row {
+      display: grid;
+      grid-template-columns: 92px 1fr;
+      gap: 0.6rem;
+      padding: 0.12rem 0;
+      border-bottom: 1px solid rgba(37, 45, 61, 0.55);
+    }
+
+    .nd-row:last-child { border-bottom: 0; }
+
+    .nd-key {
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .nd-val {
+      color: var(--text);
+      text-align: right;
+      overflow-wrap: anywhere;
+    }
+
+
     #list-panel {
       grid-column: 2; grid-row: 3;
       padding: 1.8rem 1.1rem 1rem;
@@ -586,6 +677,17 @@
     <span><i style="background:#f7a24f"></i>Officer</span>
     <span><i style="background:#5fd0a0"></i>Intermediary</span>
   </div>
+
+  <div id="node-details" aria-label="Node details">
+    <div class="nd-head">
+      <div class="nd-title">Node Details</div>
+      <button id="node-details-close" type="button" aria-label="Hide node details">×</button>
+    </div>
+    <div id="node-details-body">
+      <div class="nd-empty">Click a node to see details.</div>
+    </div>
+  </div>
+
   <p id="graph-hint">Click a country to see its offshore network.</p>
 </div>
 

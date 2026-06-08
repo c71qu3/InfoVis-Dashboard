@@ -1,4 +1,11 @@
-import { fetchEntityGraph, fetchEntityFocusedGraph, fetchIntermediaryFocusedGraph, fetchOfficerFocusedGraph, fetchJurisdictions } from './api.js';
+import {
+  fetchEntityGraph,
+  fetchEntityFocusedGraph,
+  fetchIntermediaryFocusedGraph,
+  fetchOfficerFocusedGraph,
+  fetchJurisdictions,
+  fetchOffshoreNodeDetails
+} from './api.js';
 import { initInfoPopover } from './utils.js';
 
 const TYPE_COLORS = {
@@ -14,6 +21,11 @@ const LINE_PALETTE = ['#4f8ef7', '#f7a24f', '#5fd0a0', '#b07ff7', '#e0708f', '#5
 export function createGraphPanel({ tooltip }) {
   const graphHint = document.getElementById('graph-hint');
 
+  // Node Details panel (bottom-right overlay in the graph panel).
+  const nodeDetailsEl = document.getElementById('node-details');
+  const nodeDetailsBody = document.getElementById('node-details-body');
+  const nodeDetailsCloseBtn = document.getElementById('node-details-close');
+
   // "i" popover explaining the ICIJ node types.
   initInfoPopover('graph-info-btn', 'graph-info-popover');
 
@@ -22,6 +34,13 @@ export function createGraphPanel({ tooltip }) {
   let graphSim = null;
   let graphZoom = null;
   let graphReq = 0;
+
+  // Selection state (for click-to-inspect in this panel).
+  let selectedNodeId = null;
+  let nodeDetailsReq = 0;
+  let nodeDetailsDismissed = false;
+  let currentGraphNodeSelection = null;
+  let currentGraphFocusId = null;
 
   function ensureGraphSvg() {
     if (graphSvg) return;
@@ -32,6 +51,9 @@ export function createGraphPanel({ tooltip }) {
     graphG = graphSvg.append('g');
     graphZoom = d3.zoom().scaleExtent([0.2, 5]).on('zoom', (e) => graphG.attr('transform', e.transform));
     graphSvg.call(graphZoom);
+
+    // Clicking empty space clears the selection.
+    graphSvg.on('click', () => clearSelectedNode());
   }
 
   function fitView(nodes, rScale) {
@@ -74,12 +96,155 @@ export function createGraphPanel({ tooltip }) {
       });
   }
 
+  function setNodeDetailsStatus(text) {
+    nodeDetailsBody.innerHTML = '';
+    const p = document.createElement('div');
+    p.className = 'nd-status';
+    p.textContent = text;
+    nodeDetailsBody.appendChild(p);
+  }
+
+  function appendNodeDetailsRow(key, value) {
+    const row = document.createElement('div');
+    row.className = 'nd-row';
+
+    const k = document.createElement('div');
+    k.className = 'nd-key';
+    k.textContent = key;
+
+    const v = document.createElement('div');
+    v.className = 'nd-val';
+    v.textContent = value;
+
+    row.appendChild(k);
+    row.appendChild(v);
+    nodeDetailsBody.appendChild(row);
+  }
+
+
+  function clearSelectedNode({ keepPanelHidden = false } = {}) {
+    selectedNodeId = null;
+    nodeDetailsReq++;
+
+    // Reset selection styling.
+    if (currentGraphNodeSelection) {
+      currentGraphNodeSelection
+        .attr('stroke', (d) => (currentGraphFocusId && String(d.id) === currentGraphFocusId ? '#f75a4f' : '#0f1117'))
+        .attr('stroke-width', (d) => (currentGraphFocusId && String(d.id) === currentGraphFocusId ? 3 : 1));
+    }
+
+    if (keepPanelHidden || nodeDetailsDismissed) {
+      nodeDetailsEl.hidden = true;
+      return;
+    }
+
+    nodeDetailsEl.hidden = false;
+    nodeDetailsBody.innerHTML = '<div class="nd-empty">Click a node to see details.</div>';
+  }
+
+  async function selectNode(d) {
+    if (!d) return;
+
+    nodeDetailsDismissed = false;
+    nodeDetailsEl.hidden = false;
+
+    const nodeId = String(d.id);
+    selectedNodeId = nodeId;
+
+    // Update styling for selected node.
+    const SELECT_BORDER = '#ffffff';
+    if (currentGraphNodeSelection) {
+      currentGraphNodeSelection
+        .attr('stroke', (n) => {
+          const nid = String(n.id);
+          if (nid === selectedNodeId) return SELECT_BORDER;
+          if (currentGraphFocusId && nid === currentGraphFocusId) return '#f75a4f';
+          return '#0f1117';
+        })
+        .attr('stroke-width', (n) => {
+          const nid = String(n.id);
+          if (nid === selectedNodeId) return 3;
+          if (currentGraphFocusId && nid === currentGraphFocusId) return 3;
+          return 1;
+        });
+    }
+
+    // Base (local) info from the graph itself.
+    nodeDetailsBody.innerHTML = '';
+    appendNodeDetailsRow('Name', d.label || '');
+    appendNodeDetailsRow('Type', d.type || 'Node');
+    appendNodeDetailsRow('ID', nodeId);
+    appendNodeDetailsRow('Links', (d.degree ?? 0).toLocaleString());
+
+    const isNumericId = /^\d+$/.test(nodeId);
+
+    // Extended metadata via the (proxied) Reconciliation "extend" API.
+    if (!isNumericId) {
+      appendNodeDetailsRow('ICIJ API', 'Not available (non-numeric id)');
+      return;
+    }
+
+    const token = ++nodeDetailsReq;
+    const status = document.createElement('div');
+    status.className = 'nd-status';
+    status.textContent = 'Loading Offshore Leaks metadata…';
+    nodeDetailsBody.appendChild(status);
+
+    let details;
+    try {
+      details = await fetchOffshoreNodeDetails(nodeId);
+    } catch (e) {
+      if (token !== nodeDetailsReq) return;
+      console.warn(e);
+      status.textContent = 'Could not load Offshore Leaks metadata.';
+      return;
+    }
+
+    if (token !== nodeDetailsReq) return;
+
+    // If the user clicked a different node while we were fetching.
+    if (selectedNodeId !== nodeId) return;
+
+    status.remove();
+
+    const row = details?.row || {};
+
+    const listToStr = (v) => {
+      if (Array.isArray(v)) {
+        const xs = v.map((o) => (o && typeof o === 'object' ? o.str : String(o))).filter(Boolean);
+        return xs.length ? xs.join(', ') : '—';
+      }
+      if (v && typeof v === 'object' && 'str' in v) return v.str;
+      if (v == null) return '—';
+      const s = String(v);
+      return s || '—';
+    };
+
+    const countryCodes = listToStr(row.country_codes);
+    const jurisdiction = listToStr(row.jurisdiction);
+
+    let schema = listToStr(row.schema);
+    // schema often comes as a URL; keep it compact.
+    if (schema && schema.includes('/')) schema = schema.split('/').pop();
+
+    appendNodeDetailsRow('Jurisdiction', jurisdiction);
+    appendNodeDetailsRow('Country codes', countryCodes);
+    if (schema && schema !== '—') appendNodeDetailsRow('Schema', schema);
+  }
+
+  // Close/hide the node details overlay.
+  nodeDetailsCloseBtn?.addEventListener('click', () => {
+    nodeDetailsDismissed = true;
+    nodeDetailsEl.hidden = true;
+  });
+
   function clear() {
     graphReq++; // invalidate any in-flight request
     if (graphSim) graphSim.stop();
     if (graphG) graphG.selectAll('*').remove();
     graphHint.style.display = '';
     graphHint.textContent = 'Click a country to see its offshore network.';
+    clearSelectedNode();
   }
 
   async function loadEntityGraph(iso3, name) {
@@ -250,6 +415,9 @@ export function createGraphPanel({ tooltip }) {
     if (graphSim) graphSim.stop();
     ensureGraphSvg();
 
+    // New render = clear any previous node selection.
+    clearSelectedNode({ keepPanelHidden: nodeDetailsDismissed });
+
     document.getElementById('graph-legend').style.display = 'flex';
 
     const el = document.getElementById('graph-panel');
@@ -259,6 +427,7 @@ export function createGraphPanel({ tooltip }) {
     graphG.selectAll('*').remove();
 
     const focus = focusId != null ? String(focusId) : null;
+    currentGraphFocusId = focus;
     const MAX_HOPS = 3;
 
     // Filter out Address nodes (they tend to be high-fanout and overwhelm the view).
@@ -372,7 +541,13 @@ export function createGraphPanel({ tooltip }) {
       .call(nodeDrag())
       .on('mouseover', (e, d) => tooltip.show(e, `${d.label} · ${d.type}${d.degree ? ` · ${d.degree} links` : ''}`))
       .on('mousemove', tooltip.move)
-      .on('mouseout', tooltip.hide);
+      .on('mouseout', tooltip.hide)
+      .on('click', (e, d) => {
+        e.stopPropagation();
+        selectNode(d);
+      });
+
+    currentGraphNodeSelection = node;
 
     // Optional outer ring around the focused node to make it easier to spot.
     const focusRing = focus
@@ -457,6 +632,10 @@ export function createGraphPanel({ tooltip }) {
     if (graphSim) graphSim.stop();
     ensureGraphSvg();
 
+    // New render = clear any previous node selection.
+    clearSelectedNode({ keepPanelHidden: nodeDetailsDismissed });
+    currentGraphFocusId = null;
+
     document.getElementById('graph-legend').style.display = 'none'; // entity legend N/A here
     graphG.selectAll('*').remove();
 
@@ -496,7 +675,19 @@ export function createGraphPanel({ tooltip }) {
       .call(nodeDrag())
       .on('mouseover', (e, d) => tooltip.show(e, `${d.label} · ${d.degree.toLocaleString()} cross-border links`))
       .on('mousemove', tooltip.move)
-      .on('mouseout', tooltip.hide);
+      .on('mouseout', tooltip.hide)
+      .on('click', (e, d) => {
+        e.stopPropagation();
+        // This view is ISO3 jurisdictions; still show basic details.
+        selectNode({
+          id: d.id,
+          label: d.label,
+          type: 'Jurisdiction',
+          degree: d.degree
+        });
+      });
+
+    currentGraphNodeSelection = node;
 
     const label = graphG.append('g').selectAll('text')
       .data(nodes).join('text')

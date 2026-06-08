@@ -1,5 +1,8 @@
 from flask import Flask, render_template, jsonify, request
+import json
 import re
+import urllib.parse
+import urllib.request
 from pathlib import Path
 
 from src.app_utils import (
@@ -174,9 +177,60 @@ def api_intermediaries(iso3):
     return jsonify(result)
 
 
+
+@app.route("/api/offshore_node/<node_id>")
+def api_offshore_node(node_id):
+    """Fetch a tiny bit of public metadata about a node from ICIJ Offshore Leaks.
+
+    Uses the Reconciliation "extend" API (proxied server-side to avoid browser CORS
+    issues):
+      https://offshoreleaks.icij.org/api/v1/reconcile?extend=...
+
+    We currently request:
+      - country_codes
+      - jurisdiction
+
+    Note: the response also typically includes a "schema" field.
+    """
+
+    node_id = (node_id or "").strip()
+    if not re.match(r"^\d+$", node_id):
+        return jsonify({"error": "Invalid node id"}), 400
+
+    extend_obj = {
+        "ids": [int(node_id)],
+        "properties": [
+            {"id": "country_codes"},
+            {"id": "jurisdiction"},
+        ],
+    }
+
+    extend_qs = urllib.parse.quote(json.dumps(extend_obj, separators=(",", ":")))
+    url = f"https://offshoreleaks.icij.org/api/v1/reconcile?extend={extend_qs}"
+
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={
+                "Accept": "application/json",
+                "User-Agent": "InfoVis-Dashboard/0.1",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            payload = resp.read().decode("utf-8")
+        data = json.loads(payload) if payload else {}
+    except Exception as e:
+        return jsonify({"error": "Failed to fetch Offshore Leaks details", "detail": str(e)}), 502
+
+    row = (data.get("rows") or {}).get(node_id) or {}
+    meta = data.get("meta") or []
+    return jsonify({"id": node_id, "row": row, "meta": meta})
+
+
 @app.route("/")
 def index():
     return render_template("index.html")
+
 
 
 @app.route("/api/countries")

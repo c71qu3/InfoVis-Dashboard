@@ -162,3 +162,8 @@ export async function fetchOfficerFocusedGraph(officerId, {
 
   return await fetchJson(url);
 }
+
+// Proxy-backed ICIJ Offshore Leaks “Reconciliation extend” details for a node id.
+export async function fetchOffshoreNodeDetails(nodeId) {
+  return await fetchJson(`/api/offshore_node/${encodeURIComponent(nodeId)}`);
+}

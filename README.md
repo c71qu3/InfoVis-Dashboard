@@ -33,16 +33,17 @@ To ensure proper data usage, user must download the data first.
 The containers will generate the filtered CSVs automatically on first run (see below).
 
 ---
+### Build App
 
 From the repository root:
 
-### Using Podman (Linux)
+#### Using Podman (Linux)
 
 ```bash
 podman-compose up --build
 ```
 
-### Using Podman (macOS/Windows)
+#### Using Podman (macOS/Windows)
 
 ```bash
 podman machine init
@@ -51,7 +52,7 @@ podman compose up --build
 ```
 > **macOS only:** If `podman compose` is not found, try `podman-compose up --build` with hythen instead.
 
-### Using Docker
+#### Using Docker
 
 ```bash
 docker compose up --build

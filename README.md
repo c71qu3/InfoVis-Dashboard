@@ -1,91 +1,245 @@
-# Information Visualization Project
+# InfoVis Dashboard (Neo4j + Flask)
 
+This project builds an interactive dashboard on top of the ICIJ *Offshore Leaks* dataset.
+For local development and reproducibility it runs as two containers:
 
-## Project Structure
+- **Neo4j** graph database
+- **Flask** web app that prepares the data (optional) and loads it into Neo4j
 
-    project/
-    ├── README.md
-    ├── docker-compose.yml
-    │
-    ├── filter_data.ipynb
-    ├── filter_data.py
-    ├── .python-version
-    ├── pyproject.toml
-    ├── uv.lock
-    │
-    ├── data/
-    │   ├── raw/
-    │   ├── full-oldb.LATEST.zip
-    │   ├── Address.csv
-    │   ├── Edges.csv
-    │   ├── Entity.csv
-    │   ├── Intermediary.csv
-    │   └── Officer.csv
-    │
-    ├── neo4j/
-    │   ├── logs/
-    │   ├── config/
-    │   ├── data/
-    │   └── plugins/
-    │
-    └── app/
-        ├── Dockerfile
-        ├── app.py
-        └── src/
-            ├── upsert.py
-            ├── check.py
-            └── plugins
+The repository contains a small data-prep pipeline that filters the raw ICIJ export to only **Panama Papers** entries to keep the dataset manageable.
 
-The CSV files in `data/` are extracted by `filter_data.ipynb`.
-The `neo4j/` directory and its sub-directories are created by the Neo4j container.
+---
 
+## Prerequisites
 
-## Data
+- Either **Podman + podman-compose** *or* **Docker + Docker Compose**
+- (Optional, for running scripts locally) **uv**: https://docs.astral.sh/uv/
 
-In `/filter_data.ipynb` only _Panama Papers_ entries are kept in order to make the data more manageable.
+---
 
+## Data download (required)
 
-## Setup
+1. Download the *Offshore Leaks* database ZIP from:
+   https://offshoreleaks.icij.org/pages/database
+2. Place the downloaded `.zip` into:
 
-1. Clone the repo:
+   ```text
+   ./data/
+   ```
 
-```{bash}
-git clone git@github.com:c71qu3/InfoVis-Dashboard.git
-```
+The containers will generate the filtered CSVs automatically on first run (see below).
 
-2. Download the ZIP file and save it in the `InfoVis-Dashboard/data/` directory. The raw data can be found [here](https://offshoreleaks.icij.org/pages/database).
+---
 
-3. Prepare the workspace by running:
+## Quickstart (recommended)
 
-```{bash}
-uv venv
-uv sync
-```
+From the repository root:
 
-4. Build and run the containers from the `InfoVis-Dashboard/` directory.
+### Using Podman (Linux)
 
-   On first startup the `app` container will automatically run `filter_data.py` to unpack/filter the downloaded ZIP (only if the filtered CSVs are missing in `./data/`).
-
-   **Note:** If you use _Docker_ instead of _Podman_ just replace the commands (`docker-compose` in place of `podman-compose`).
-
-   For Linux users:
-
-```{bash}
+```bash
 podman-compose up --build
 ```
 
-For other OS users:
+### Using Podman (macOS/Windows)
 
-```
+```bash
 podman machine init
 podman machine start
+podman-compose up --build
 ```
 
-If the Neo4j database is empty it will take a moment to load the data.
-When ready, it will show the Flask app [http://localhost:5000](http://localhost:5000) in the host machine.
+### Using Docker
 
-To stop the container:
+```bash
+docker compose up --build
+```
 
-```{bash}
+When the import has finished:
+
+- App: http://localhost:5001
+- Neo4j Browser: http://localhost:7474
+  - user: `neo4j`
+  - password: `password`
+
+To stop everything:
+
+```bash
 podman-compose down
+# or
+docker compose down
 ```
+
+---
+
+## What happens on first startup?
+
+The `app` container runs `app/src/startup.py`, which:
+
+1. **Prepares data** (only if needed)
+   - If the filtered CSVs do **not** exist in `./data/`, it runs `filter_data.py` inside the container.
+2. **Waits for Neo4j** to become reachable.
+3. **Upserts** the CSVs into Neo4j (`app/src/upsert.py`).
+4. Starts the Flask server.
+
+### Forcing a fresh data preparation
+
+If you want to re-generate the filtered CSVs even if they already exist, set:
+
+- `FORCE_PREPARE_DATA=1`
+
+in `docker-compose.yml` (service `app`) or via your compose overrides.
+
+---
+
+## Project structure
+
+```text
+.
+├── docker-compose.yml            # Neo4j + app services
+├── filter_data.ipynb             # Notebook version of the data filter
+├── filter_data.py                # Generates filtered CSVs from the downloaded ZIP
+├── data/                         # Input ZIP + generated CSVs
+│   ├── *.zip                     # Downloaded ICIJ export
+│   ├── Address.csv               # Generated (filtered)
+│   ├── Edges.csv                 # Generated (filtered)
+│   ├── Entity.csv                # Generated (filtered)
+│   ├── Intermediary.csv          # Generated (filtered)
+│   └── Officer.csv               # Generated (filtered)
+├── neo4j/                        # Created/used by the Neo4j container (mounted volume)
+└── app/
+    ├── Dockerfile
+    ├── app.py                    # Flask entrypoint
+    ├── templates/
+    │   └── index.html            # Single-page UI (loads /static/main.js)
+    ├── static/
+    │   ├── main.js               # Frontend entrypoint (ES module)
+    │   ├── js/                   # Frontend modules
+    │   └── data/                 # Map/lookup assets (topojson, ISO mappings, ...)
+    └── src/
+        ├── startup.py            # Prepare data → wait for Neo4j → import → start app
+        ├── upsert.py             # CSV → Neo4j import logic
+        └── check.py              # Helper checks
+```
+
+---
+
+## Frontend JavaScript files
+
+The UI is a single page (`app/templates/index.html`) that loads `app/static/main.js` as an **ES module**.
+Most functionality is split into small modules under `app/static/js/`.
+
+> Note: **D3 v7** and **topojson-client** are loaded via CDN in `index.html` and used as globals (`d3`, `topojson`).
+
+### Entry point
+
+- `app/static/main.js`
+  - Bootstraps the dashboard.
+  - Loads lookup tables (ISO code maps), connection counts, and outgoing-edge counts.
+  - Initializes the three main UI components (map, info panel, graph panel, list panel) and wires up selection callbacks.
+
+### API client
+
+- `app/static/js/api.js`
+  - Thin wrapper around backend endpoints (`/api/...`).
+  - Used by all panels to fetch graphs, lists, World Bank indicators/years, and jurisdiction connection data.
+
+### UI components (panels)
+
+- `app/static/js/map.js`
+  - Renders the world map choropleth (D3 + TopoJSON), including zoom/pan.
+  - Handles country hover/selection state.
+  - Draws *jurisdiction connection arcs* for the selected country and renders a small side list of connected jurisdictions.
+
+- `app/static/js/infoPanel.js`
+  - Manages the “Country Info” panel.
+  - Fetches World Bank indicators and renders them as cards.
+  - Builds the year selector (latest vs. a specific year).
+
+- `app/static/js/graphPanel.js`
+  - Manages the “Knowledge Graph” panel.
+  - Renders force-directed graphs for:
+    - country-level entity networks (`/api/graph/<ISO3>`)
+    - focused subgraphs for a selected entity/intermediary/officer
+  - Handles node click → “Node Details” overlay, including optional metadata fetched via `/api/offshore_node/<id>`.
+
+- `app/static/js/listPanel.js`
+  - Manages the “Node List” panel.
+  - Fetches paginated node lists for the selected country, supports search + type filter.
+  - Clicking a list item loads a focused graph in the graph panel.
+
+### Small helpers
+
+- `app/static/js/countrySearch.js`
+  - Implements the country typeahead search box (useful for small/hard-to-click countries).
+
+- `app/static/js/tooltip.js`
+  - Simple tooltip helper used by the map and graph.
+
+- `app/static/js/utils.js`
+  - Shared utilities (e.g., compact number formatting, “info” popovers).
+
+### ISO / country-code helpers
+
+- `app/static/js/countryCodes.js`
+  - Builds/resolves *country name → ISO2* (for World Bank indicators) with a small alias set.
+
+- `app/static/js/isoNumeric.js`
+  - Builds *TopoJSON numeric id → ISO3* mapping using `iso_numeric.json`.
+  - Needed because the map geometry uses numeric ids while the backend uses ISO3.
+
+### Static frontend data assets
+
+- `app/static/data/world-topo.json` — world geometry (TopoJSON)
+- `app/static/data/iso_numeric.json` — mapping `{ ISO3 -> numeric }` used to connect map shapes to backend ISO3 codes
+
+---
+
+## Running the data filter locally (optional)
+
+If you prefer to generate the filtered CSVs on the host (instead of inside the container):
+
+```bash
+uv venv
+uv sync
+uv run python filter_data.py
+```
+
+---
+
+## Configuration
+
+The compose file sets the following defaults:
+
+- Neo4j auth: `NEO4J_AUTH=neo4j/password`
+- App → Neo4j connection:
+  - `NEO4J_URI=bolt://neo4j:7687`
+  - `NEO4J_USER=neo4j`
+  - `NEO4J_PASSWORD=password`
+- Startup behavior:
+  - `AUTO_PREPARE_DATA=1` (generate filtered CSVs if missing)
+  - `FORCE_PREPARE_DATA=0` (override to regenerate)
+  - `NEO4J_WAIT_SECONDS=90` (timeout while waiting for Neo4j)
+
+---
+
+## Troubleshooting
+
+- **Neo4j is empty / app can’t find data**
+  - Ensure a `.zip` file exists in `./data/`.
+  - Check container logs:
+
+    ```bash
+    podman-compose logs -f app
+    podman-compose logs -f neo4j
+    ```
+
+- **You want a clean database**
+  - Stop containers and remove the mounted Neo4j data directory:
+
+    ```bash
+    podman-compose down
+    rm -rf ./neo4j/data
+    ```
+
+  Then start again.

@@ -84,12 +84,12 @@ def api_jurisdictions():
 
 @app.route("/api/entity_graph/<entity_id>")
 def api_entity_graph(entity_id):
-    # Backward-compatible params (previously used to *sample* the neighborhood)
+    # Per-node fan-out limits
     intermediaries = clamp_arg(request.args, "intermediaries", 6, 1, 25)
     per_i = clamp_arg(request.args, "per_i", 6, 1, 25)
     officers = clamp_arg(request.args, "officers", 2, 0, 10)
 
-    # New params: connected-subgraph limits
+    # Subgraph traversal limits
     depth = clamp_arg(request.args, "depth", 4, 0, 4)
     max_nodes = clamp_arg(request.args, "max_nodes", 5000, 1, 20000)
     max_rels = clamp_arg(request.args, "max_rels", 20000, 0, 60000)
@@ -108,12 +108,12 @@ def api_entity_graph(entity_id):
 
 @app.route("/api/intermediary_graph/<intermediary_id>")
 def api_intermediary_graph(intermediary_id):
-    # Backward-compatible params (previously used to *sample* the neighborhood)
+    # Per-node fan-out limits
     iso3 = (request.args.get("iso3") or "").strip().upper() or None
     entities = clamp_arg(request.args, "entities", 12, 1, 80)
     officers = clamp_arg(request.args, "officers", 2, 0, 10)
 
-    # New params: connected-subgraph limits
+    # Subgraph traversal limits
     depth = clamp_arg(request.args, "depth", 4, 0, 4)
     max_nodes = clamp_arg(request.args, "max_nodes", 5000, 1, 20000)
     max_rels = clamp_arg(request.args, "max_rels", 20000, 0, 60000)
@@ -132,11 +132,11 @@ def api_intermediary_graph(intermediary_id):
 
 @app.route("/api/officer_graph/<officer_id>")
 def api_officer_graph(officer_id):
-    # Backward-compatible params (previously used to *sample* the neighborhood)
+    # Per-node fan-out limits
     entities = clamp_arg(request.args, "entities", 12, 1, 80)
     intermediaries = clamp_arg(request.args, "intermediaries", 6, 0, 25)
 
-    # New params: connected-subgraph limits
+    # Subgraph traversal limits
     depth = clamp_arg(request.args, "depth", 4, 0, 4)
     max_nodes = clamp_arg(request.args, "max_nodes", 5000, 1, 20000)
     max_rels = clamp_arg(request.args, "max_rels", 20000, 0, 60000)

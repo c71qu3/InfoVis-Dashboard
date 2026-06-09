@@ -78,12 +78,12 @@ export async function fetchIntermediaries(iso3, { limit = 200, offset = 0, q = n
 }
 
 export async function fetchEntityFocusedGraph(entityId, {
-  // Connected-subgraph controls (preferred)
+  // Subgraph traversal limits
   depth = 4,
   max_nodes = 5000,
   max_rels = 20000,
 
-  // Backward-compatible params (no longer required; server accepts them)
+  // Per-node fan-out limits
   intermediaries = null,
   per_i = null,
   officers = null,
@@ -107,12 +107,12 @@ export async function fetchEntityFocusedGraph(entityId, {
 }
 
 export async function fetchIntermediaryFocusedGraph(intermediaryId, {
-  // Connected-subgraph controls (preferred)
+  // Subgraph traversal limits
   depth = 4,
   max_nodes = 5000,
   max_rels = 20000,
 
-  // Backward-compatible params (iso3 is intentionally ignored server-side now)
+  // Per-node fan-out limits (iso3 is ignored server-side)
   iso3 = null,
   entities = null,
   officers = null,
@@ -123,7 +123,6 @@ export async function fetchIntermediaryFocusedGraph(intermediaryId, {
   if (max_nodes != null) params.set('max_nodes', String(max_nodes));
   if (max_rels != null) params.set('max_rels', String(max_rels));
 
-  // Keep these for backward compatibility with older servers/clients.
   if (iso3) params.set('iso3', String(iso3));
   if (entities != null) params.set('entities', String(entities));
   if (officers != null) params.set('officers', String(officers));
@@ -137,12 +136,12 @@ export async function fetchIntermediaryFocusedGraph(intermediaryId, {
 }
 
 export async function fetchOfficerFocusedGraph(officerId, {
-  // Connected-subgraph controls (preferred)
+  // Subgraph traversal limits
   depth = 4,
   max_nodes = 5000,
   max_rels = 20000,
 
-  // Backward-compatible params
+  // Per-node fan-out limits
   entities = null,
   intermediaries = null,
 } = {}) {
@@ -163,7 +162,7 @@ export async function fetchOfficerFocusedGraph(officerId, {
   return await fetchJson(url);
 }
 
-// Proxy-backed ICIJ Offshore Leaks “Reconciliation extend” details for a node id.
+// Proxy-backed ICIJ Offshore Leaks "Reconciliation extend" details for a node id.
 export async function fetchOffshoreNodeDetails(nodeId) {
   return await fetchJson(`/api/offshore_node/${encodeURIComponent(nodeId)}`);
 }

@@ -1,5 +1,5 @@
 // Search-to-select dropdown for picking a country by name.
-// Complements clicking on the map — useful for small countries (e.g. Hong Kong).
+// Complements clicking on the map, useful for small countries (e.g. Hong Kong).
 export function createCountrySearch({ inputId, resultsId, countries, onSelect }) {
   const input = document.getElementById(inputId);
   const results = document.getElementById(resultsId);

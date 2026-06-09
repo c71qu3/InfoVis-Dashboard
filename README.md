@@ -221,7 +221,6 @@ The compose file sets the following defaults:
   - `FORCE_PREPARE_DATA=0` (override to regenerate)
   - `NEO4J_WAIT_SECONDS=90` (timeout while waiting for Neo4j)
 
----
 
 ## Troubleshooting
 
@@ -243,3 +242,34 @@ The compose file sets the following defaults:
     ```
 
   Then start again.
+
+---
+
+## AI Usage
+
+In line with the [TU Wien guidelines on AI in education](https://www.tuwien.at/en/studies/teaching-at-tu-wien/digitally-supported-teaching/artificial-intelligence-in-education),
+we disclose that generative AI tools were used as coding assistants during this
+project. All AI-assisted output was reviewed, adapted, and integrated by us; the
+design, interaction, and data-query decisions are our own.
+
+- **Tools used:** AI models: Claude, ChatGPT
+
+We did not track AI assistance line-by-line, so we document it at the component
+level for the parts we built:
+
+| Component | Files | AI involvement |
+| --- | --- | --- |
+| Knowledge-Graph panel | `app/static/js/graphPanel.js`, graph endpoints in `app/app.py` / `app/src/graph_layer.py` | It is AI-assisted. The force-directed rendering, node-details overlay, and Neo4j query/endpoint code were drafted with AI, then reviewed and adapted. The panel concept (country click → offshore network) and interaction design are ours. |
+| Node List panel | `app/static/js/listPanel.js`, search query in `app/src/graph_layer.py` | AI-assisted. Pagination and the search + type-filter UI were drafted with AI; the filtering logic and backend query were designed and reviewed by us. |
+
+### Reflection: using AI in the data-analysis process
+
+AI support was most useful for drafting repetitive implementation details, such
+as D3/DOM wiring, Flask endpoint structure, and Cypher query variants. It was
+less reliable for dataset-specific issues, especially ICIJ data conventions,
+Neo4j import behavior, and deciding whether a graph result was meaningful. Those
+parts required manual inspection, debugging, and validation against the actual
+data. Overall, AI sped up implementation, but the interpretation, interaction
+design, and final checks remained team decisions.
+
+---

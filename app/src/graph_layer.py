@@ -67,7 +67,7 @@ def _build_node_match(node_type: str) -> str:
     """
     if node_type in _NODE_MATCH_CLAUSES:
         return f"{_NODE_MATCH_CLAUSES[node_type]} WITH DISTINCT n"
-    # 'all' — union of every supported type
+    # 'all': union of every supported type
     parts = [f"{clause} RETURN n" for clause in _NODE_MATCH_CLAUSES.values()]
     return "CALL {\n" + "\nUNION\n".join(parts) + "\n} WITH DISTINCT n"
 
@@ -352,7 +352,7 @@ RETURN a.country_codes AS ca, b.country_codes AS cb, count(*) AS w
 #   - Officers connected to those entities
 #
 # For each other jurisdiction, we count how many DISTINCT nodes from that focus set have
-# at least one relationship to any node whose *primary* country code is the other ISO3.
+# at least one relationship to any node whose primary country code is the other ISO3.
 # This yields "shared nodes" (not raw relationship/edge counts), so weights don't balloon.
 JURIS_FOCUS_NODECOUNT_QUERY = """
 CALL {

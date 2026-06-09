@@ -73,6 +73,12 @@ podman compose down # or podman-compose down
 # or
 docker compose down
 ```
+---
+
+## Dashboard Preview
+
+![app demo](app/static/data/infoviz_panama.png)
+
 
 ---
 

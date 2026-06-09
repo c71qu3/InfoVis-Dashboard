@@ -263,7 +263,6 @@ level for the parts we built:
 | --- | --- | --- |
 | Knowledge-Graph panel | `app/static/js/graphPanel.js`, graph endpoints in `app/app.py` / `app/src/graph_layer.py` | It is AI-assisted. The force-directed rendering, node-details overlay, and Neo4j query/endpoint code were drafted with AI, then reviewed and adapted. The panel concept (country click → offshore network) and interaction design are ours. |
 | Node List panel | `app/static/js/listPanel.js`, search query in `app/src/graph_layer.py` | AI-assisted. Pagination and the search + type-filter UI were drafted with AI; the filtering logic and backend query were designed and reviewed by us. |
-
 | Frontend | `templates/index.html`, `app/static/js/map.js`, stable call in `app/src/workd_bank.py` | AI-assisted. The map color scaling, arc paths, rendered list, and world bank api call error handling were drafted with AI, also some styling details such as pulsing dot top left. The panel layout, map structure, world bank info and display, aesthetic design, color palette, and interaction model are designed and reviewed by us. |
 
 ### Reflection: using AI in the data-analysis process

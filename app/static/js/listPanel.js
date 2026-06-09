@@ -208,7 +208,7 @@ export function createListPanel({ onSelectIntermediary, onSelectEntity, onSelect
   }
 
   if (typeEl) {
-    // Ensure our internal default matches the DOM default.
+    // Ensure our internal default matches the DOM default
     currentType = typeEl.value || currentType;
 
     typeEl.addEventListener('change', () => {
@@ -245,7 +245,7 @@ export function createListPanel({ onSelectIntermediary, onSelectEntity, onSelect
       for (const el of listEl.querySelectorAll('button.entity-item.selected')) el.classList.remove('selected');
       btn.classList.add('selected');
 
-      // Open the focused graph that matches the clicked node's type.
+      // Open the focused graph that matches the clicked node's type
       if (nodeType === 'entity' && typeof onSelectEntity === 'function') {
         onSelectEntity(nodeId, nodeName, currentIso3);
       } else if (nodeType === 'intermediary' || !nodeType) {

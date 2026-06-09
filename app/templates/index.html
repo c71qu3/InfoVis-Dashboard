@@ -53,7 +53,7 @@
       color: var(--accent);
       font-weight: 400;
     }
-
+    /* Pulsing dot next to the title*/
     header .dot {
       width: 6px; height: 6px;
       border-radius: 50%;
@@ -93,7 +93,6 @@
     #map-panel svg:active { cursor: grabbing; }
 
     .country {
-  /* fill: #1e2a40;  REMOVE THIS LINE */
   stroke: #2a3a55;
   stroke-width: 0.4px;
   transition: fill 0.15s;
@@ -103,7 +102,7 @@
     .country.has-data {
       cursor: pointer;
     }
-
+    /* overwrite color */
     .country.selected {
       fill: var(--selected) !important;
       stroke: #fff;
@@ -392,7 +391,7 @@
       vertical-align: middle;
     }
 
-    /* Node Details panel (inside Knowledge Graph) */
+    /* node Details panel (inside Knowledge Graph) */
     #node-details {
       position: absolute;
       right: 8px;
@@ -644,7 +643,7 @@
   </div>
 </div>
 
-<!-- INFO -->
+<!-- world bank indicator -->
 <div class="panel" id="info-panel">
   <div class="panel-label">Country World Bank Indicators</div>
   <div id="country-search">

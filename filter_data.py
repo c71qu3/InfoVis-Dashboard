@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# Required Modules & Constants
 import pandas as pd
 import glob
 import zipfile
@@ -14,7 +13,7 @@ SELECTED_LEAKS = ["Panama Papers"]
 os.makedirs(DATAPATH, exist_ok=True)
 
 
-# Load CSV Data
+# load csv data
 for zf_path in glob.glob(ZIPFILE):
     with zipfile.ZipFile(zf_path, 'r') as zf:
         for member in zf.namelist():
@@ -23,7 +22,7 @@ for zf_path in glob.glob(ZIPFILE):
 
 nodes = {}
 
-# Address nodes
+# address nodes
 nodes["Address"] = pd.read_csv(
     DATAPATH + "nodes-addresses.csv",
     dtype={
@@ -40,7 +39,7 @@ nodes["Address"] = pd.read_csv(
     low_memory=False
 )
 
-# Entity nodes
+# entity nodes
 nodes["Entity"] = pd.read_csv(
     DATAPATH + "nodes-entities.csv",
     dtype={
@@ -74,7 +73,7 @@ nodes["Entity"] = pd.read_csv(
     low_memory=False
 )
 
-# Intermediary nodes
+# intermediary nodes
 nodes["Intermediary"] = pd.read_csv(
     DATAPATH + "nodes-intermediaries.csv",
     dtype={
@@ -93,7 +92,7 @@ nodes["Intermediary"] = pd.read_csv(
     low_memory=False
 )
 
-# Officer nodes
+# officer nodes
 nodes["Officer"] = pd.read_csv(
     DATAPATH + "nodes-officers.csv",
     dtype={
@@ -109,7 +108,7 @@ nodes["Officer"] = pd.read_csv(
     low_memory=False
 )
 
-# Other nodes
+# other nodes
 nodes["Other"] = pd.read_csv(
     DATAPATH + "nodes-others.csv",
     dtype={
@@ -135,7 +134,7 @@ nodes["Other"] = pd.read_csv(
     low_memory=False
 )
 
-# Edges between nodes
+# edges between nodes
 edges = pd.read_csv(
     DATAPATH + "relationships.csv",
     dtype={
@@ -156,7 +155,7 @@ edges = pd.read_csv(
 )
 
 
-# Filter for `SELECTED_LEAKS` and Save Results
+# filter for `SELECTED_LEAKS` and save results
 def filter_by_leaks(df: pd.DataFrame) -> pd.DataFrame:
     return df[df["sourceID"].isin(SELECTED_LEAKS)]
 
@@ -187,7 +186,7 @@ edges = format_dates_iso(edges, date_columns["Edges"])
 edges.to_csv(f"data/Edges.csv", index=False)
 
 
-# Remove Raw CSV Files
+# remove row csv files
 for f in glob.glob("data/raw/*"):
     if os.path.isfile(f):
         os.remove(f)

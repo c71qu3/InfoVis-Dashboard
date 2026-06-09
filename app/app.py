@@ -36,7 +36,7 @@ DATA_DIR = Path("static/data")
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 
 
-# Pre-compute:
+# pre-compute:
 # - raw appearance counts (ISO3 -> count)
 # - outgoing cross-border edges (ISO3 -> count) for clickability
 connection_counts = count_connections_iso3(DATA_DIR)

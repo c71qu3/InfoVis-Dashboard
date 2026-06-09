@@ -1,6 +1,6 @@
 /**
  * Build topojson numeric id → ISO3.
- * This reads /static/data/iso_numeric.json, which maps ISO3 → numeric.
+ * This reads /static/data/iso_numeric.json, which maps ISO3 -> numeric
  */
 export async function buildNumericToIso3Map(url = '/static/data/iso_numeric.json') {
   const numericToIso3 = new Map();

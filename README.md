@@ -16,8 +16,11 @@ The repository contains a small data-prep pipeline that filters the raw ICIJ exp
 - (Optional, for running scripts locally) **uv**: https://docs.astral.sh/uv/
 
 ---
+## Quickstart
 
-## Data download (required)
+### Data download (mandatory)
+
+To ensure proper data usage, user must download the data first.
 
 1. Download the *Offshore Leaks* database ZIP from:
    https://offshoreleaks.icij.org/pages/database
@@ -30,8 +33,6 @@ The repository contains a small data-prep pipeline that filters the raw ICIJ exp
 The containers will generate the filtered CSVs automatically on first run (see below).
 
 ---
-
-## Quickstart (recommended)
 
 From the repository root:
 
@@ -46,8 +47,9 @@ podman-compose up --build
 ```bash
 podman machine init
 podman machine start
-podman-compose up --build
+podman compose up --build
 ```
+> **macOS only:** If `podman compose` is not found, try `podman-compose up --build` with hythen instead.
 
 ### Using Docker
 
@@ -55,17 +57,16 @@ podman-compose up --build
 docker compose up --build
 ```
 
-When the import has finished:
+When the import has finished, the main app is available at **http://localhost:5001** (not 5000)— that is our project product. Building is finished when you see `app-1 Running on all addresses (0.0.0.0)....`
 
-- App: http://localhost:5001
-- Neo4j Browser: http://localhost:7474
-  - user: `neo4j`
-  - password: `password`
+> **First build may take 5–10 minutes**
+
+Neo4j Browser (http://localhost:7474, user: `neo4j`, password: `password`) is exposed for inspection only; you do not need to use it directly.
 
 To stop everything:
 
 ```bash
-podman-compose down
+podman compose down # or podman-compose down
 # or
 docker compose down
 ```
@@ -242,6 +243,7 @@ The compose file sets the following defaults:
     ```
 
   Then start again.
+- **Windows:** If you see `unauthorized: incorrect username or password` during build, Docker and Podman may be conflicting. Run `podman pull python:3.13-slim` first, then retry.
 
 ---
 
@@ -261,6 +263,8 @@ level for the parts we built:
 | --- | --- | --- |
 | Knowledge-Graph panel | `app/static/js/graphPanel.js`, graph endpoints in `app/app.py` / `app/src/graph_layer.py` | It is AI-assisted. The force-directed rendering, node-details overlay, and Neo4j query/endpoint code were drafted with AI, then reviewed and adapted. The panel concept (country click → offshore network) and interaction design are ours. |
 | Node List panel | `app/static/js/listPanel.js`, search query in `app/src/graph_layer.py` | AI-assisted. Pagination and the search + type-filter UI were drafted with AI; the filtering logic and backend query were designed and reviewed by us. |
+
+| Frontend | `templates/index.html`, `app/static/js/map.js`, stable call in `app/src/workd_bank.py` | AI-assisted. The map color scaling, arc paths, rendered list, and world bank api call error handling were drafted with AI, also some styling details such as pulsing dot top left. The panel layout, map structure, world bank info and display, aesthetic design, color palette, and interaction model are designed and reviewed by us. |
 
 ### Reflection: using AI in the data-analysis process
 

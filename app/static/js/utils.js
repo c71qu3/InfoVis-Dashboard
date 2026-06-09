@@ -1,4 +1,4 @@
-// Small shared utilities
+// shared utilities
 
 /**
  * Format numbers for display (k/M/B/T). Returns an em dash for null/undefined.

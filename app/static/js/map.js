@@ -1,3 +1,5 @@
+// build a log color scale from the iso3 counts so countries with more offshore connections appear darker 
+
 function buildColorScale(iso3Counts) {
   const countsArray = Object.values(iso3Counts || {}).filter((v) => v > 0);
   const minCount = countsArray.length > 0 ? Math.min(...countsArray) : 1;
@@ -16,7 +18,7 @@ function buildColorScale(iso3Counts) {
 
   return { colorScale, countsArray, minCount, maxCount };
 }
-
+// gradient legend pinned to top-right of the map svg
 function renderLegend({ svg, W, minCount, maxCount, countsArray }) {
   if (!countsArray || countsArray.length === 0) return;
 
@@ -89,7 +91,7 @@ export async function initWorldMap({
     const rawCount = iso3 ? Number(iso3Counts?.[iso3] || 0) : 0;
     const outgoingCount = iso3 ? Number(iso3Outgoing?.[iso3] || 0) : 0;
 
-    // Clickability is based on *outgoing cross-border edges*, not raw appearances.
+    // clickability is based on *outgoing cross-border edges*, not raw appearances
     const hasOutgoing = Boolean(iso3) && Number.isFinite(outgoingCount) && outgoingCount > 0;
 
     return {
@@ -103,10 +105,10 @@ export async function initWorldMap({
   function getCountryColor(feature) {
     const { hasOutgoing, rawCount } = getNetworkStatus(feature);
 
-    // Grey out anything with no outgoing cross-border edges.
+    // grey out anything with no outgoing cross-border edges
     if (!hasOutgoing) return NO_NETWORK_COLOR;
 
-    // If it has outgoing edges but rawCount is 0, fall back to a neutral fill.
+    // if it has outgoing edges but rawCount is 0, fall back to a neutral fill.
     if (!rawCount) return '#1e2a40';
 
     return colorScale(rawCount);
@@ -160,7 +162,7 @@ export async function initWorldMap({
   renderLegend({ svg, W, minCount, maxCount, countsArray });
 
   function updateLegendPosition() {
-    // Keep legend pinned to top-right.
+    //  legend pinned to top-right.
     svg.select('.map-legend')
       .attr('transform', `translate(${W - 120 - 20}, 20)`);
   }
@@ -515,7 +517,7 @@ export async function initWorldMap({
       clearJurisdictionArcs();
     },
 
-    // Selectable countries (those with an offshore network), for the search box.
+    // selectable countries , those with an offshore network, for the search box
     getSelectableCountries() {
       const seen = new Set();
       const list = [];
@@ -529,7 +531,7 @@ export async function initWorldMap({
       return list;
     },
 
-    // Programmatically select a country by ISO3 (used by the search box).
+    // select a country by ISO3 (used by the search box).
     async selectCountryByIso3(iso3) {
       const target = String(iso3 || '').trim().toUpperCase();
       if (!target) return false;

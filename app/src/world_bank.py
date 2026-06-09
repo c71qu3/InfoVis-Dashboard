@@ -7,8 +7,7 @@ import requests
 _session = requests.Session()
 _executor = ThreadPoolExecutor(max_workers=8)
 
-
-# World Bank indicators
+# map the indicator names
 WB_INDICATORS = {
     "GDP (current US$)": "NY.GDP.MKTP.CD",
     "GDP per capita (US$)": "NY.GDP.PCAP.CD",
@@ -42,7 +41,7 @@ def get_all_countries():
         return []
 
 
-def fetch_latest_for_indicator(iso2, label, code):
+def fetch_latest_for_indicator(iso2, label, code): # to reduce nan values on front end
     url = f"https://api.worldbank.org/v2/country/{iso2}/indicator/{code}?format=json&per_page=100"
     try:
         r = _session.get(url, timeout=10)

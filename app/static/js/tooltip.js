@@ -5,7 +5,7 @@
 export function initTooltip(tooltipId = 'tooltip') {
   const tooltip = document.getElementById(tooltipId);
   if (!tooltip) {
-    // Fail softly so the rest of the UI still works.
+    // fail softly so the rest of the UI still works.
     return {
       show() {},
       move() {},

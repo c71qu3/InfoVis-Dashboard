@@ -58,7 +58,9 @@ podman compose up --build
 docker compose up --build
 ```
 
-When the import has finished, the main app is available at **http://localhost:5001** (not 5000)— that is our project product. Building is finished when you see `app-1 Running on all addresses (0.0.0.0)....`
+When the import has finished, the main app is available at **http://localhost:5001** (not 5000)— that is our project product. 
+
+Building is finished when you see `app-1 Running on all addresses (0.0.0.0)....`
 
 > **First build may take 5–10 minutes**
 

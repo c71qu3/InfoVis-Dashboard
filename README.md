@@ -260,8 +260,7 @@ The compose file sets the following defaults:
 
 In line with the [TU Wien guidelines on AI in education](https://www.tuwien.at/en/studies/teaching-at-tu-wien/digitally-supported-teaching/artificial-intelligence-in-education),
 we disclose that generative AI tools were used as coding assistants during this
-project. All AI-assisted output was reviewed, adapted, and integrated by us; the
-design, interaction, and data-query decisions are our own.
+project. 
 
 - **Tools used:** AI models: Claude, ChatGPT
 

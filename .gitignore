@@ -8,5 +8,10 @@ neo4j/
 # Raw/local data copies. App demo assets live in app/static/data/.
 data/
 
+!app/
+!app/static/
+!app/static/data/
+!app/static/data/infoviz_panama.png
+
 # Local editor/tool state
 .DS_Store

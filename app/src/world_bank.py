@@ -20,6 +20,8 @@ WB_INDICATORS = {
 }
 
 
+# the try/except structure referenced to AI
+
 latest_cache = {}
 year_cache = {}
 

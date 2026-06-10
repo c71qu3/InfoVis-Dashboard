@@ -18,6 +18,7 @@ export function createListPanel({ onSelectIntermediary, onSelectEntity, onSelect
   let currentType = 'all';
   const pageSize = 200;
 
+  // AI assisted
   // Plural noun used in the summary line, depending on the selected type.
   const TYPE_NOUN = {
     all: 'results',
@@ -81,7 +82,7 @@ export function createListPanel({ onSelectIntermediary, onSelectEntity, onSelect
     setStatus('Select a country to view its nodes.');
   }
 
-  function renderItems(items, { append = false } = {}) {
+  function renderItems(items, { append = false } = {}) { // AI assited
     if (!listEl) return;
     if (!append) listEl.innerHTML = '';
 
@@ -112,7 +113,7 @@ export function createListPanel({ onSelectIntermediary, onSelectEntity, onSelect
     listEl.appendChild(frag);
   }
 
-  async function loadNextPage(token) {
+  async function loadNextPage(token) { // AI assisted
     if (!currentIso3) return;
 
     let data;
@@ -182,6 +183,7 @@ export function createListPanel({ onSelectIntermediary, onSelectEntity, onSelect
 
     await loadNextPage(token);
   }
+  // AI assisted
 
   // Re-run the current query from the top (used by the search box / type filter).
   async function reload() {

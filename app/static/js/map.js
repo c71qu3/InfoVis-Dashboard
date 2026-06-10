@@ -124,6 +124,7 @@ export async function initWorldMap({
   const projection = d3.geoNaturalEarth1().fitSize([W, H], { type: 'Sphere' });
   const pathGen = d3.geoPath().projection(projection);
 
+  // AI assisted
   // Precompute projected arc endpoints so we can draw cross-border arcs quickly.
   // Prefer capital coordinates (World Bank), fall back to polygon centroid.
   // Map: ISO3 -> [x,y] in screen coordinates (before zoom/pan transforms).

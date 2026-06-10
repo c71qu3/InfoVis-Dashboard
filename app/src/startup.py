@@ -52,7 +52,7 @@ def _data_ready() -> bool:
     return True
 
 
-def _prepare_data_if_needed() -> None:
+def _prepare_data_if_needed() -> None:  # AI assisted 
     """Generate the filtered CSVs in DATA_DIR from the downloaded ZIP.
 
     This makes `podman-compose up --build` a single-step startup:

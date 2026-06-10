@@ -16,6 +16,8 @@ const TYPE_COLORS = {
   Node: '#6b7a99'
 };
 
+// please refer to readme for AI assisted part
+
 const LINE_PALETTE = ['#4f8ef7', '#f7a24f', '#5fd0a0', '#b07ff7', '#e0708f', '#5cc8e0', '#d8c45a', '#8c7bf0'];
 
 export function createGraphPanel({ tooltip }) {

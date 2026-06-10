@@ -77,7 +77,7 @@ export async function fetchIntermediaries(iso3, { limit = 200, offset = 0, q = n
   return await fetchJson(url);
 }
 
-export async function fetchEntityFocusedGraph(entityId, {
+export async function fetchEntityFocusedGraph(entityId, { /* AI assisted */
   // Subgraph traversal limits
   depth = 4,
   max_nodes = 5000,

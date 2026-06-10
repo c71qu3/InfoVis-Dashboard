@@ -91,7 +91,7 @@ const worldMap = await initWorldMap({
   iso3ToCapitalLonLat,
   onSelect: async ({ name, iso2, iso3 }) => {
     const token = ++arcReq;
-
+    // AI assisted
     // Load arcs (jurisdiction connections) in parallel
     const jurisPromise = iso3 ? fetchJurisdictions(iso3) : Promise.resolve(null);
 

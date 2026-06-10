@@ -82,7 +82,7 @@ def api_jurisdictions():
     return jsonify(result)
 
 
-@app.route("/api/entity_graph/<entity_id>")
+@app.route("/api/entity_graph/<entity_id>") # AI assisted
 def api_entity_graph(entity_id):
     # Per-node fan-out limits
     intermediaries = clamp_arg(request.args, "intermediaries", 6, 1, 25)
@@ -178,7 +178,7 @@ def api_intermediaries(iso3):
 
 
 
-@app.route("/api/offshore_node/<node_id>")
+@app.route("/api/offshore_node/<node_id>") # AI assisted
 def api_offshore_node(node_id):
     """Fetch a tiny bit of public metadata about a node from ICIJ Offshore Leaks.
 

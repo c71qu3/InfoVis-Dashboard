@@ -20,13 +20,13 @@ EDGES_PATH = DATAPATH.format("Edges")
 FORCE_RELOAD = os.environ.get("FORCE_RELOAD", "0") == "1"
 
 
-def db_has_data(driver) -> bool:
+def db_has_data(driver) -> bool: # AI assisted 
     with driver.session() as session:
         rec = session.run("MATCH (n:Node) RETURN count(n) AS c").single()
         return (rec["c"] or 0) > 0
 
 
-def load_csv_upsert(
+def load_csv_upsert( 
     driver, label: str, path: str,
     dtype: dict, unique_key: str="node_id",
     batch: int=5000, date_cols: list=[]
@@ -54,7 +54,7 @@ def load_csv_upsert(
 
     constraint_name = f"node_{unique_key}_unique"
 
-    def _ensure_constraints(tx):
+    def _ensure_constraints(tx): # AI assisted 
         tx.run(
             f"""
             CREATE CONSTRAINT {constraint_name} IF NOT EXISTS
@@ -62,7 +62,7 @@ def load_csv_upsert(
             REQUIRE n.{unique_key} IS UNIQUE
             """)
 
-    def _upsert_batch(tx, batch_rows):
+    def _upsert_batch(tx, batch_rows): # AI assisted 
         tx.run(
             f"""
             UNWIND $rows AS row
@@ -222,7 +222,7 @@ def load_edges_csv(driver, path: str = EDGES_PATH, batch: int = 5000) -> int:
     df["edge_id"] = df.apply(_edge_id, axis=1)
 
     total = 0
-    with driver.session() as session:
+    with driver.session() as session:  # AI assisted 
         for rel_type, grp in df.groupby("rel_type", dropna=True):
             rel_type_str = str(rel_type)
 
@@ -237,7 +237,7 @@ def load_edges_csv(driver, path: str = EDGES_PATH, batch: int = 5000) -> int:
                     REQUIRE r.edge_id IS UNIQUE
                     """)
 
-            def _merge_batch(tx, batch_rows) -> int:
+            def _merge_batch(tx, batch_rows) -> int:  # AI assisted 
                 res = tx.run(
                     f"""
                     UNWIND $rows AS row
@@ -256,7 +256,7 @@ def load_edges_csv(driver, path: str = EDGES_PATH, batch: int = 5000) -> int:
     return total
 
 
-try:
+try:  # AI assisted 
     driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASS))
 
     if db_has_data(driver) and not FORCE_RELOAD:

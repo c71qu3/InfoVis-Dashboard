@@ -3,7 +3,7 @@
  * Note: we keep the original behaviour of filtering out "non-countries" by
  * requiring a capitalCity.
  */
-export async function buildNameToIso2Map() {
+export async function buildNameToIso2Map() { /* AI assisted */
   const nameToIso2 = new Map();
   try {
     const wbRes = await fetch('https://api.worldbank.org/v2/country?format=json&per_page=300');

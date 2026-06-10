@@ -1,6 +1,6 @@
 import { fetchIndicators, fetchYears } from './api.js';
 
-export function createInfoPanel({ fmt }) {
+export function createInfoPanel({ fmt }) { // AI assisted
   // DOM elements for info panel
   const nameEl = document.getElementById('country-name');
   const loadingEl = document.getElementById('loading-indicator');

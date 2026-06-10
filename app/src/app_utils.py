@@ -57,7 +57,7 @@ def count_connections_iso3(data_dir: Path, csv_files=None) -> dict:
     return counts
 
 
-def count_outgoing_crossborder_edges_iso3(data_dir: Path) -> dict:
+def count_outgoing_crossborder_edges_iso3(data_dir: Path) -> dict:  # AI assisted 
     """Count a *country-level offshore network signal* (ISO3 -> edge count).
 
     The UI notion of "clickable" should match what the entity-network query can
@@ -156,7 +156,7 @@ def count_outgoing_crossborder_edges_iso3(data_dir: Path) -> dict:
     return counts
 
 
-def clamp_arg(args, name: str, default: int, lo: int, hi: int) -> int:
+def clamp_arg(args, name: str, default: int, lo: int, hi: int) -> int:  # AI assisted 
     """
     Clamp an integer query parameter from a Flask request.args-like mapping.
     """

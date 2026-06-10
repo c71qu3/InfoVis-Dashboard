@@ -265,12 +265,13 @@ design, interaction, and data-query decisions are our own.
 
 - **Tools used:** AI models: Claude, ChatGPT
 
-We did not track AI assistance line-by-line, so we document it at the component
-level for the parts we built:
+AI assistance was used in the project to varying degrees, including for
+drafting some parts of code, debugging, and trying implementation options.
+Not every instance was tracked in-line at the time of writing/prompting. We therefore document it at the component level here, where we can speak to it with confidence. **All AI-assisted output was reviewed, tested, and adapted by us; the design decisions, data-analysis choices, and interaction concepts are our own.**
 
 | Component | Files | AI involvement |
 | --- | --- | --- |
-| Knowledge-Graph panel | `app/static/js/graphPanel.js`, graph endpoints in `app/app.py` / `app/src/graph_layer.py` | It is AI-assisted. The force-directed rendering, node-details overlay, and Neo4j query/endpoint code were drafted with AI, then reviewed and adapted. The panel concept (country click → offshore network) and interaction design are ours. |
+| Knowledge-Graph panel | `app/static/js/graphPanel.js`, graph endpoints in `app/app.py` / `app/src/graph_layer.py` | AI-assisted. The force-directed rendering, node-details overlay, and Neo4j query/endpoint code were drafted with AI, then reviewed and adapted. The panel concept (country click → offshore network) and interaction design are ours. |
 | Node List panel | `app/static/js/listPanel.js`, search query in `app/src/graph_layer.py` | AI-assisted. Pagination and the search + type-filter UI were drafted with AI; the filtering logic and backend query were designed and reviewed by us. |
 | Frontend | `templates/index.html`, `app/static/js/map.js`, stable call in `app/src/workd_bank.py` | AI-assisted. The map color scaling, arc paths, rendered list, and world bank api call error handling were drafted with AI, also some styling details such as pulsing dot top left. The panel layout, map structure, world bank info and display, aesthetic design, color palette, and interaction model are designed and reviewed by us. |
 
@@ -279,9 +280,6 @@ level for the parts we built:
 AI support was most useful for drafting repetitive implementation details, such
 as D3/DOM wiring, Flask endpoint structure, and Cypher query variants. It was
 less reliable for dataset-specific issues, especially ICIJ data conventions,
-Neo4j import behavior, and deciding whether a graph result was meaningful. Those
-parts required manual inspection, debugging, and validation against the actual
-data. Overall, AI sped up implementation, but the interpretation, interaction
-design, and final checks remained team decisions.
+Neo4j import behavior, and deciding whether a graph result was meaningful. Those parts required manual inspection, debugging, and validation against the actual data. Overall, AI sped up implementation, but the interpretation, interaction design, and final checks remained team decisions.
 
 ---

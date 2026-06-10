@@ -4,8 +4,9 @@ from neo4j import GraphDatabase
 
 from src.world_bank import iso3_to_name
 
-
-# Neo4j connection config
+# neo4j quries is AI-assisted, reviewed and adapted by the team. 
+# other AI assited parts can be found in readme
+# neo4j connection config
 NEO4J_URI = os.environ.get("NEO4J_URI", "bolt://neo4j:7687")
 NEO4J_USER = os.environ.get("NEO4J_USER", "neo4j")
 NEO4J_PASS = os.environ.get("NEO4J_PASSWORD", "password")

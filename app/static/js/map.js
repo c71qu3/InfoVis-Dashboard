@@ -180,6 +180,7 @@ export async function initWorldMap({
   // Side list: countries connected to the selected country via the rendered arcs.
   const ARC_LIST_CLASS = 'map-arc-country-list';
 
+  /** AI-assisted: drafted with an AI assistant, reviewed and adapted by the team. */
   function ensureArcListEl() {
     let el = mapEl.querySelector(`.${ARC_LIST_CLASS}`);
     if (el) return el;
@@ -217,6 +218,7 @@ export async function initWorldMap({
     el.style.display = 'none';
   }
 
+  /** AI-assisted: drafted with an AI assistant (Claude/ChatGPT), reviewed and adapted by the team. */
   function renderConnectedCountriesList({ focus, focusLabel, connections }) {
     const el = ensureArcListEl();
     el.style.display = 'block';
@@ -257,6 +259,7 @@ export async function initWorldMap({
     clearConnectedCountriesList();
   }
 
+  /** AI-assisted: drafted with an AI assistant (Claude/ChatGPT), reviewed and adapted by the team. */
   function arcPath([x1, y1], [x2, y2]) {
     const dx = x2 - x1;
     const dy = y2 - y1;
@@ -276,6 +279,7 @@ export async function initWorldMap({
     return `M${x1},${y1} Q${cx},${cy} ${x2},${y2}`;
   }
 
+  /** AI-assisted: drafted with an AI assistant (Claude/ChatGPT), reviewed and adapted by the team. */
   function renderJurisdictionArcs(jurisData, focusIso3 = null) {
     // Clear current arcs but keep the last data so we can re-render on resize.
     arcsG.selectAll('*').remove();
@@ -405,6 +409,7 @@ export async function initWorldMap({
     .classed('has-data', (d) => getNetworkStatus(d).hasOutgoing)
     .classed('no-network', (d) => !getNetworkStatus(d).hasOutgoing);
 
+  /** AI-assisted: drafted with an AI assistant (Claude/ChatGPT), reviewed and adapted by the team. */
   function handleResize() {
     const newW = mapEl.clientWidth;
     const newH = mapEl.clientHeight;

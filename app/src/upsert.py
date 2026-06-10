@@ -183,6 +183,8 @@ def load_officer_csv(driver, path: str=OFFICER_PATH, batch: int=5000) -> int:
 
 
 def load_edges_csv(driver, path: str = EDGES_PATH, batch: int = 5000) -> int:
+    """AI-assisted: the edge-id hashing and per-rel-type constraint/MERGE batching were
+    drafted with an AI assistant, reviewed and adapted by the team."""
     df = pd.read_csv(
         path,
         dtype={
